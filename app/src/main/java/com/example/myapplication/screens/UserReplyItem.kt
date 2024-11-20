@@ -49,42 +49,44 @@ fun UserReplyItem(
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                AsyncImage(
-                    model = post.userProfileImageUrl,
-                    contentDescription = "Profile Picture",
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop,
-                    error = painterResource(id = R.drawable.person)
-                )
+            // Left column for profile pictures and connecting line
+            Box(modifier = Modifier.width(40.dp)) {
+                // Vertical connecting line that spans full height
                 Box(
                     modifier = Modifier
                         .width(2.dp)
-                        .height(80.dp)
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+                        .fillMaxHeight()
+                        .align(Alignment.Center)
+                        .background(
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f),
+                            shape = RoundedCornerShape(1.dp)
+                        )
                 )
-                AsyncImage(
-                    model = reply.userProfileImageUrl,
-                    contentDescription = "Reply Profile Picture",
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop,
-                    error = painterResource(id = R.drawable.person)
-                )
+
+                // Profile pictures column
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    AsyncImage(
+                        model = post.userProfileImageUrl,
+                        contentDescription = "Profile Picture",
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop,
+                        error = painterResource(id = R.drawable.person)
+                    )
+                }
             }
 
+            // Right column for content
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .padding(start = 12.dp)
             ) {
                 // Original post content
-                Column(modifier = Modifier.padding(bottom = 16.dp)) {
+                Column(modifier = Modifier.padding(bottom = 8.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -123,21 +125,39 @@ fun UserReplyItem(
                     )
                 }
 
-                // Reply content
+                // Reply content with profile picture next to username
                 Column {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.Top // Changed to Top alignment
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = reply.userName, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "· ${reply.timestamp?.toRelativeTimeString() ?: ""}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AsyncImage(
+                                model = reply.userProfileImageUrl,
+                                contentDescription = "Reply Profile Picture",
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape),
+                                contentScale = ContentScale.Crop,
+                                error = painterResource(id = R.drawable.person)
                             )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(text = reply.userName, fontWeight = FontWeight.Bold)
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "· ${reply.timestamp?.toRelativeTimeString() ?: ""}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                    )
+                                }
+                                Text(text = reply.content)
+                            }
                         }
                         IconButton(
                             onClick = { showOptionsMenu = true },
@@ -150,8 +170,8 @@ fun UserReplyItem(
                             )
                         }
                     }
-                    Text(text = reply.content)
 
+                    Spacer(modifier = Modifier.height(8.dp))
                     InteractionButtons(
                         likes = reply.likes,
                         comments = reply.replies,

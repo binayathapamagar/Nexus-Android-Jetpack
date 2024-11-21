@@ -12,10 +12,9 @@ import androidx.navigation.NavController
 import com.example.myapplication.PostViewModel
 import com.example.myapplication.PostWithReplies
 
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ThreadScreen(
+fun PostReplies(
     navController: NavController,
     postViewModel: PostViewModel,
     postId: String,
@@ -37,7 +36,7 @@ fun ThreadScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            "Thread",
+                            "Replies",
                             fontWeight = FontWeight.Bold
                         )
                     }

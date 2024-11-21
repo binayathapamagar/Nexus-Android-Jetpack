@@ -1,6 +1,10 @@
 package com.example.myapplication.screens
 
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,6 +27,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
+//import android.content.Context
+//import android.os.Build
+//import android.os.VibrationEffect
+//import android.os.Vibrator
+import android.view.HapticFeedbackConstants
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -159,6 +170,47 @@ fun NewPostSection(
     }
 }
 
+
+@Composable
+fun RepostHeader(
+    repostedByName: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Repeat,
+            contentDescription = "Reposted",
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = "$repostedByName reposted",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+@Composable
+fun rememberHapticFeedback() = remember {
+    HapticFeedback()
+}
+
+class HapticFeedback {
+    fun performHapticFeedback(view: android.view.View) {
+        view.performHapticFeedback(
+            HapticFeedbackConstants.VIRTUAL_KEY,
+            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+        )
+    }
+}
+
 @Composable
 fun PostItem(
     post: Post,
@@ -170,6 +222,22 @@ fun PostItem(
     var showImageViewer by remember { mutableStateOf(false) }
     var initialPage by remember { mutableIntStateOf(0) }
     var isLiked by remember { mutableStateOf(post.isLikedByCurrentUser) }
+    var isReposted by remember { mutableStateOf(post.isRepostedByCurrentUser) }
+    var showRepostDialog by remember { mutableStateOf(false) }
+    val haptic = rememberHapticFeedback()
+    val view = LocalView.current
+
+    // Animation states for repost button
+    val repostIconScale by animateFloatAsState(
+        targetValue = if (isReposted) 1.2f else 1f,
+        animationSpec = spring(dampingRatio = 0.4f, stiffness = 400f),
+        label = ""
+    )
+    val repostIconColor by animateColorAsState(
+        targetValue = if (isReposted) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onSurface,
+        animationSpec = tween(durationMillis = 300),
+        label = ""
+    )
 
     Column(
         modifier = modifier
@@ -179,7 +247,7 @@ fun PostItem(
             }
             .padding(16.dp)
     ) {
-        // Header section with profile picture and timestamp
+        // Header section
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
@@ -228,10 +296,9 @@ fun PostItem(
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-        // Post content
         Text(post.content)
 
-        // Image gallery section
+        // Image gallery
         if (post.imageUrls.isNotEmpty()) {
             Spacer(modifier = Modifier.height(8.dp))
             LazyRow {
@@ -254,7 +321,7 @@ fun PostItem(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Action buttons (like, comment, repost, share)
+        // Action buttons
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
@@ -303,14 +370,24 @@ fun PostItem(
 
             // Repost button
             IconButton(
-                onClick = { postViewModel.repostPost(post.id) },
+                onClick = {
+                    if (isReposted) {
+                        showRepostDialog = true
+                    } else {
+                        isReposted = true
+                        postViewModel.repostPost(post.id)
+                        haptic.performHapticFeedback(view)
+                    }
+                },
                 modifier = Modifier.size(40.dp)
             ) {
                 Icon(
-                    imageVector = if (post.reposts > 0) Icons.Filled.Repeat else Icons.Outlined.Repeat,
-                    contentDescription = "Repost",
-                    tint = if (post.reposts > 0) Color.Green else MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(22.dp)
+                    imageVector = if (isReposted) Icons.Filled.Repeat else Icons.Outlined.Repeat,
+                    contentDescription = if (isReposted) "Remove Repost" else "Repost",
+                    tint = repostIconColor,
+                    modifier = Modifier
+                        .size(22.dp)
+                        .scale(repostIconScale)
                 )
             }
             Text(
@@ -335,7 +412,7 @@ fun PostItem(
             }
         }
 
-        // Options dialog for deleting a post
+        // Options dialog
         if (showOptionsMenu) {
             AlertDialog(
                 onDismissRequest = { showOptionsMenu = false },
@@ -354,7 +431,80 @@ fun PostItem(
         }
     }
 
-    // Image viewer for post images
+    // Repost dialog
+    if (showRepostDialog) {
+        AlertDialog(
+            onDismissRequest = { showRepostDialog = false },
+            icon = {
+                Icon(
+                    Icons.Filled.Repeat,
+                    contentDescription = null,
+                    tint = Color(0xFF4CAF50),
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = { Text("Remove Repost?") },
+            text = { Text("This post will be removed from your profile's reposts.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        isReposted = false
+                        postViewModel.undoRepost(post.id)
+                        showRepostDialog = false
+                        haptic.performHapticFeedback(view)
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF4CAF50)
+                    )
+                ) {
+                    Text("Remove")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRepostDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showRepostDialog) {
+        AlertDialog(
+            onDismissRequest = { showRepostDialog = false },
+            icon = {
+                Icon(
+                    Icons.Filled.Repeat,
+                    contentDescription = null,
+                    tint = Color(0xFF4CAF50),
+                    modifier = Modifier.size(32.dp)
+                )
+            },
+            title = { Text("Remove Repost?") },
+            text = { Text("This post will be removed from your profile's reposts.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        isReposted = false
+                        postViewModel.undoRepost(post.id)
+                        showRepostDialog = false
+                        haptic.performHapticFeedback(view)
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF4CAF50)
+                    )
+                ) {
+                    Text("Remove")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRepostDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    // Image viewer
     if (showImageViewer) {
         FullScreenImageViewer(
             imageUrls = post.imageUrls,
@@ -363,6 +513,19 @@ fun PostItem(
         )
     }
 }
+
+//// Haptic feedback function
+//private fun performHapticFeedback(context: Context) {
+//    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+//    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+//        vibrator.vibrate(VibrationEffect.createOneShot(40, VibrationEffect.DEFAULT_AMPLITUDE))
+//    } else {
+//        @Suppress("DEPRECATION")
+//        vibrator.vibrate(40)
+//    }
+//}
+
+
 
 
 

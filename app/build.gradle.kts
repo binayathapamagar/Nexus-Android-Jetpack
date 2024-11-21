@@ -76,6 +76,8 @@ dependencies {
 
     // Accompanist for permissions handling
     implementation("com.google.accompanist:accompanist-permissions:0.32.0")
+    implementation(libs.androidx.webkit)
+    implementation(libs.engage.core)
 
     // Testing
     testImplementation("junit:junit:4.13.2")

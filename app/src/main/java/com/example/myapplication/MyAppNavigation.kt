@@ -1,6 +1,5 @@
 package com.example.myapplication
 
-import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -20,27 +19,17 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
     val authState by authViewModel.authState.collectAsState()
     val postViewModel: PostViewModel = viewModel()
 
+    // Handle authentication-based navigation
     LaunchedEffect(authState) {
-        when (authState) {
-            is AuthState.Authenticated -> {
-                try {
-                    navController.navigate(Routes.MAIN) {
-                        popUpTo(Routes.LOGIN) { inclusive = true }
-                    }
-                } catch (e: Exception) {
-                    Log.e("Navigation", "Error navigating to main: ${e.message}")
-                }
+        val destination = when (authState) {
+            is AuthState.Authenticated -> Routes.MAIN
+            is AuthState.Unauthenticated -> Routes.LOGIN
+            else -> null
+        }
+        destination?.let {
+            navController.navigate(it) {
+                popUpTo(navController.graph.startDestinationId) { inclusive = true }
             }
-            is AuthState.Unauthenticated -> {
-                try {
-                    navController.navigate(Routes.LOGIN) {
-                        popUpTo(navController.graph.startDestinationId) { inclusive = true }
-                    }
-                } catch (e: Exception) {
-                    Log.e("Navigation", "Error navigating to login: ${e.message}")
-                }
-            }
-            else -> {}
         }
     }
 
@@ -108,35 +97,27 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
         ) { backStackEntry ->
             val postId = backStackEntry.arguments?.getString("postId")
             postId?.let {
-                val post by postViewModel.getPost(it).collectAsState(initial = null)
-                val replies by postViewModel.replies.collectAsState()
-
-                LaunchedEffect(postId) {
-                    postViewModel.fetchReplies(postId)
-                }
-
-                post?.let { p ->
-                    PostWithReplies(
-                        post = p,
-                        replies = replies,
-                        postViewModel = postViewModel,
-                        navController = navController
-                    )
-                }
+                PostReplies(
+                    navController = navController,
+                    postViewModel = postViewModel,
+                    postId = it
+                )
             }
         }
 
-        // New Thread route
         composable(
             route = Routes.THREAD,
             arguments = listOf(
-                navArgument("postId") { type = NavType.StringType }
+                navArgument("postId") {
+                    type = NavType.StringType
+                    nullable = false
+                }
             )
-        ) { backStackEntry ->
-            ThreadScreen(
+        ) { entry ->
+            Thread(
                 navController = navController,
                 postViewModel = postViewModel,
-                postId = backStackEntry.arguments?.getString("postId") ?: ""
+                postId = entry.arguments?.getString("postId") ?: ""
             )
         }
     }

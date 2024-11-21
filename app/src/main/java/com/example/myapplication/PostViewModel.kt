@@ -28,7 +28,14 @@ data class Post(
     val likes: Int = 0,
     val comments: Int = 0,
     val reposts: Int = 0,val isLikedByCurrentUser: Boolean = false,
-    val likedBy: List<String> = emptyList()
+    val likedBy: List<String> = emptyList(),
+    // New repost-related fields
+    val isRepost: Boolean = false,
+    val originalPostId: String? = null,
+    val repostedBy: String? = null,
+    val repostedByName: String? = null,
+    val repostTimestamp: Date? = null,
+    val isRepostedByCurrentUser: Boolean = false
 )
 
 class PostViewModel : ViewModel() {
@@ -46,6 +53,10 @@ class PostViewModel : ViewModel() {
 
     private val _userReplies = MutableStateFlow<List<Pair<Post, Reply>>>(emptyList())
     val userReplies: StateFlow<List<Pair<Post, Reply>>> = _userReplies.asStateFlow()
+
+    private val _userReposts = MutableStateFlow<List<Post>>(emptyList())
+    val userReposts: StateFlow<List<Post>> = _userReposts.asStateFlow()
+
 
 
 
@@ -79,7 +90,13 @@ class PostViewModel : ViewModel() {
                         "likes" to 0,
                         "comments" to 0,
                         "reposts" to 0,
-                        "likedBy" to listOf<String>()
+                        "likedBy" to listOf<String>(),
+                        "isRepost" to false,
+                        "originalPostId" to null,
+                        "repostedBy" to null,
+                        "repostedByName" to null,
+                        "repostTimestamp" to null,
+                        "isRepostedByCurrentUser" to false
                     )
 
                     firestore.collection("posts").document(postId).set(post)
@@ -241,12 +258,61 @@ class PostViewModel : ViewModel() {
     fun repostPost(postId: String) {
         viewModelScope.launch {
             try {
+                val currentUser = auth.currentUser ?: return@launch
                 val postRef = firestore.collection("posts").document(postId)
-                postRef.update("reposts", FieldValue.increment(1)).await()
+                val userDoc = firestore.collection("users").document(currentUser.uid).get().await()
+                val userName = userDoc.getString("fullName") ?: currentUser.displayName ?: "Unknown User"
+
+                // Create repost document with timestamp
+                val repostId = UUID.randomUUID().toString()
+                val timestamp = FieldValue.serverTimestamp()
+                val repost = hashMapOf(
+                    "id" to repostId,
+                    "originalPostId" to postId,
+                    "repostedByUserId" to currentUser.uid,
+                    "repostedByUserName" to userName,
+                    "timestamp" to timestamp
+                )
+
+                // Use a batch write for atomicity
+                firestore.runBatch { batch ->
+                    // Add repost to reposts collection
+                    batch.set(firestore.collection("reposts").document(repostId), repost)
+
+                    // Increment repost count and update post
+                    batch.update(postRef, mapOf(
+                        "reposts" to FieldValue.increment(1),
+                        "isRepostedByCurrentUser" to true
+                    ))
+
+                    // Add to user's reposts collection
+                    batch.set(
+                        firestore.collection("users")
+                            .document(currentUser.uid)
+                            .collection("reposts")
+                            .document(repostId),
+                        repost
+                    )
+                }.await()
+
+                // Update local state immediately
+                _posts.value = _posts.value.map { post ->
+                    if (post.id == postId) {
+                        post.copy(
+                            reposts = post.reposts + 1,
+                            isRepostedByCurrentUser = true
+                        )
+                    } else post
+                }
+
+                // Fetch updated reposts
+                fetchUserReposts(currentUser.uid)
+
+                // Create notification
                 createNotification(postId, "repost")
-                fetchPosts()
+
             } catch (e: Exception) {
-                Log.e("PostViewModel", "Error reposting: ${e.message}", e)
+                Log.e("PostViewModel", "Error creating repost: ${e.message}", e)
             }
         }
     }
@@ -561,6 +627,101 @@ class PostViewModel : ViewModel() {
                 fetchReplies(postId)
             } catch (e: Exception) {
                 Log.e("PostViewModel", "Error deleting reply: ${e.message}")
+            }
+        }
+    }
+
+    fun undoRepost(postId: String) {
+        viewModelScope.launch {
+            try {
+                val currentUser = auth.currentUser ?: return@launch
+                val postRef = firestore.collection("posts").document(postId)
+
+                // Find the repost document
+                val repostQuery = firestore.collection("reposts")
+                    .whereEqualTo("originalPostId", postId)
+                    .whereEqualTo("repostedByUserId", currentUser.uid)
+                    .get()
+                    .await()
+
+                if (!repostQuery.isEmpty) {
+                    val repostDoc = repostQuery.documents[0]
+
+                    firestore.runBatch { batch ->
+                        // Delete repost document
+                        batch.delete(firestore.collection("reposts").document(repostDoc.id))
+
+                        // Decrement repost count
+                        batch.update(postRef, mapOf(
+                            "reposts" to FieldValue.increment(-1),
+                            "isRepostedByCurrentUser" to false
+                        ))
+
+                        // Remove from user's reposts
+                        batch.delete(
+                            firestore.collection("users")
+                                .document(currentUser.uid)
+                                .collection("reposts")
+                                .document(repostDoc.id)
+                        )
+                    }.await()
+
+                    // Update local states
+                    _posts.value = _posts.value.map { post ->
+                        if (post.id == postId) {
+                            post.copy(
+                                reposts = post.reposts - 1,
+                                isRepostedByCurrentUser = false
+                            )
+                        } else post
+                    }
+
+                    // Remove the post from userReposts if we're in the profile view
+                    _userReposts.value = _userReposts.value.filter { it.id != postId }
+
+                    // Fetch updated reposts
+                    fetchUserReposts(currentUser.uid)
+                }
+
+            } catch (e: Exception) {
+                Log.e("PostViewModel", "Error removing repost: ${e.message}", e)
+            }
+        }
+    }
+
+    fun fetchUserReposts(userId: String) {
+        viewModelScope.launch {
+            try {
+                val repostsSnapshot = firestore.collection("users")
+                    .document(userId)
+                    .collection("reposts")
+                    .orderBy("timestamp", Query.Direction.DESCENDING)
+                    .get()
+                    .await()
+
+                val repostedPosts = mutableListOf<Post>()
+
+                for (repostDoc in repostsSnapshot.documents) {
+                    val originalPostId = repostDoc.getString("originalPostId") ?: continue
+                    val originalPost = firestore.collection("posts")
+                        .document(originalPostId)
+                        .get()
+                        .await()
+                        .toObject(Post::class.java)
+                        ?.copy(
+                            isRepost = true,
+                            repostedBy = repostDoc.getString("repostedByUserId"),
+                            repostedByName = repostDoc.getString("repostedByUserName"),
+                            repostTimestamp = repostDoc.getTimestamp("timestamp")?.toDate()
+                        )
+
+                    originalPost?.let { repostedPosts.add(it) }
+                }
+
+                _userReposts.value = repostedPosts
+
+            } catch (e: Exception) {
+                Log.e("PostViewModel", "Error fetching user reposts: ${e.message}", e)
             }
         }
     }

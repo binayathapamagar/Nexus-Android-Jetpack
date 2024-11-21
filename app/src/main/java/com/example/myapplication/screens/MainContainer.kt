@@ -124,6 +124,7 @@ fun MainContainer(
             composable("profile") {
                 Profile(
                     navController = navController,
+                    parentNavController = parentNavController, // Add this
                     authViewModel = authViewModel,
                     postViewModel = parentPostViewModel,
                     userId = authViewModel.currentUserId ?: ""

@@ -23,7 +23,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.myapplication.AuthViewModel
@@ -35,8 +34,9 @@ import com.example.myapplication.custom_color.color
 @Composable
 fun Profile(
     navController: NavController,
+    parentNavController: NavController,
     authViewModel: AuthViewModel,
-    postViewModel: PostViewModel = viewModel(),
+    postViewModel: PostViewModel,
     userId: String
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -50,6 +50,7 @@ fun Profile(
     val profileLink by authViewModel.profileLink.collectAsState()
     var showShareSheet by remember { mutableStateOf(false) }
     val userReplies by postViewModel.userReplies.collectAsState()
+    val userReposts by postViewModel.userReposts.collectAsState()
 
     val listState = rememberLazyListState()
     val isScrolled by remember {
@@ -62,7 +63,7 @@ fun Profile(
         when (selectedTab) {
             0 -> postViewModel.fetchPosts()
             1 -> postViewModel.fetchUserReplies(userId)
-            2 -> {} // Handle reposts tab
+            2 -> postViewModel.fetchUserReposts(userId)
         }
     }
 
@@ -270,7 +271,7 @@ fun Profile(
                             PostItem(
                                 post = post,
                                 postViewModel = postViewModel,
-                                navController = navController,
+                                navController = parentNavController,
                                 modifier = Modifier.padding(horizontal = 16.dp)
                             )
                             HorizontalDivider(
@@ -286,7 +287,7 @@ fun Profile(
                                 post = post,
                                 reply = reply,
                                 postViewModel = postViewModel,
-                                navController = navController,
+                                navController = parentNavController,
                                 modifier = Modifier.padding(horizontal = 16.dp)
                             )
                             HorizontalDivider(
@@ -297,10 +298,43 @@ fun Profile(
                         }
                     }
                     2 -> {
-                        // Handle reposts tab
+                        items(userReposts) { post ->
+                            if (post.isRepost) {
+                                RepostHeader(repostedByName = post.repostedByName ?: "")
+                            }
+                            PostItem(
+                                post = post,
+                                postViewModel = postViewModel,
+                                navController = parentNavController,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                            HorizontalDivider(
+                                modifier = Modifier.fillMaxWidth(),
+                                thickness = 1.dp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                            )
+                        }
                     }
                 }
             }
         }
     }
 }
+
+//@Composable
+//fun RepostsTab(
+//    posts: List<Post>,
+//    postViewModel: PostViewModel,
+//    navController: NavController
+//) {
+//    LazyColumn {
+//        items(posts) { post ->
+//            PostItem(
+//                post = post,
+//                postViewModel = postViewModel,
+//                navController = navController
+//            )
+//            HorizontalDivider()
+//        }
+//    }
+//}

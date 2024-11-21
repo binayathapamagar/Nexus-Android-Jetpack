@@ -45,7 +45,9 @@ fun UserReplyItem(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clickable { navController.navigate(Routes.createThreadRoute(post.id)) }
+            .clickable {
+                navController.navigate(Routes.createThreadRoute(post.id))
+            }
             .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
@@ -209,6 +211,7 @@ fun UserReplyItem(
         )
     }
 }
+
 
 @Composable
 private fun InteractionButtons(

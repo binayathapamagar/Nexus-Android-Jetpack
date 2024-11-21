@@ -272,7 +272,7 @@ fun Profile(
                                 post = post,
                                 postViewModel = postViewModel,
                                 navController = parentNavController,
-                                modifier = Modifier.padding(horizontal = 16.dp)
+                                modifier = Modifier.padding(horizontal = 8.dp)
                             )
                             HorizontalDivider(
                                 modifier = Modifier.fillMaxWidth(),

@@ -1,6 +1,7 @@
 package com.example.myapplication
 
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -15,6 +16,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import com.example.myapplication.models.User
 
 class AuthViewModel : ViewModel() {
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
@@ -42,6 +44,9 @@ class AuthViewModel : ViewModel() {
     private val _profileLink = MutableStateFlow<String?>(null)
     val profileLink: StateFlow<String?> = _profileLink.asStateFlow()
 
+    private val _users = MutableStateFlow<List<User>>(emptyList())
+    val users: StateFlow<List<User>> = _users.asStateFlow()
+
     private var userListener: ValueEventListener? = null
 
     val currentUserId: String?
@@ -49,6 +54,7 @@ class AuthViewModel : ViewModel() {
 
     init {
         checkAuthStatus()
+        fetchAllUsers()
     }
 
     private fun checkAuthStatus() {
@@ -94,8 +100,36 @@ class AuthViewModel : ViewModel() {
         userRef.addValueEventListener(userListener!!)
     }
 
-    fun fetchUserProfile() {
-        setupUserListener() // This will now set up real-time updates
+    private fun fetchAllUsers() {
+        viewModelScope.launch {
+            val userRef = database.getReference("users")
+            userRef.get().addOnSuccessListener { snapshot ->
+                if (snapshot.exists()) {
+                    Log.d("AuthViewModel", "Fetched all users successfully.")
+                    val userList = snapshot.children.mapNotNull { dataSnap ->
+                        val userId = dataSnap.key ?: return@mapNotNull null
+                        val fullName = dataSnap.child("fullName").getValue(String::class.java) ?: "Unknown Name"
+                        val username = dataSnap.child("username").getValue(String::class.java) ?: "Unknown Username"
+                        val bio = dataSnap.child("bio").getValue(String::class.java) ?: "No bio available"
+                        val profileImageUrl = dataSnap.child("profileImageUrl").getValue(String::class.java)
+
+                        User(
+                            id = userId,
+                            fullName = fullName,
+                            username = username,
+                            bio = bio,
+                            profileImageUrl = profileImageUrl
+                        )
+                    }
+                    _users.value = userList
+                } else {
+                    Log.d("AuthViewModel", "No users found.")
+                    _users.value = emptyList()
+                }
+            }.addOnFailureListener { exception ->
+                Log.e("AuthViewModel", "Error fetching users: ${exception.message}")
+            }
+        }
     }
 
     fun login(email: String, password: String) {

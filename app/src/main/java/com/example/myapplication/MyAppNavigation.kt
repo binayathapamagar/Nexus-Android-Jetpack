@@ -65,6 +65,10 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
             Settings(navController = navController, authViewModel = authViewModel)
         }
 
+        composable(Routes.SEARCH) {
+            SearchScreen(navController = navController, authViewModel = authViewModel)
+        }
+
         composable(Routes.NEW_POST) {
             NewPost(
                 navController = navController,

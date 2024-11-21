@@ -101,9 +101,9 @@ fun MainContainer(
                 )
             }
             composable("search") {
-                Search(
-                    onSearchClick = { /* Handle search */ },
-                    onTopicClick = { /* Handle topic */ }
+                SearchScreen(
+                    navController = navController,
+                    authViewModel = authViewModel
                 )
             }
             composable("newPost") {

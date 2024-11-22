@@ -320,21 +320,3 @@ fun Profile(
         }
     }
 }
-
-//@Composable
-//fun RepostsTab(
-//    posts: List<Post>,
-//    postViewModel: PostViewModel,
-//    navController: NavController
-//) {
-//    LazyColumn {
-//        items(posts) { post ->
-//            PostItem(
-//                post = post,
-//                postViewModel = postViewModel,
-//                navController = navController
-//            )
-//            HorizontalDivider()
-//        }
-//    }
-//}

@@ -41,7 +41,7 @@ class UserProfileViewModel : ViewModel() {
                     }
                 }
 
-                // Fetch User Posts, Replies, and Reposts (same as Firestore)
+                // Fetch User Posts, Replies, and Reposts from Firestore
                 fetchUserPosts(userId)
                 fetchUserReplies(userId)
                 fetchUserReposts(userId)
@@ -58,8 +58,11 @@ class UserProfileViewModel : ViewModel() {
         val profileImageRef: StorageReference = storage.child("profile_pictures/$storagePath")
         profileImageRef.downloadUrl.addOnSuccessListener { uri ->
             val profileImageUrl = uri.toString()
-            // You can update the UserProfile data with the image URL
+            // Update UserProfile with the image URL
             userProfile.value?.profileImageUrl = profileImageUrl
+        }.addOnFailureListener {
+            // Handle failure to fetch profile image (optional)
+            println("Failed to load profile image.")
         }
     }
 
@@ -75,6 +78,9 @@ class UserProfileViewModel : ViewModel() {
                     post?.let { postsList.add(it) }
                 }
                 posts.value = postsList
+            }.addOnFailureListener {
+                // Handle failure to fetch posts (optional)
+                println("Failed to load posts.")
             }
     }
 
@@ -90,6 +96,9 @@ class UserProfileViewModel : ViewModel() {
                     reply?.let { repliesList.add(it) }
                 }
                 replies.value = repliesList
+            }.addOnFailureListener {
+                // Handle failure to fetch replies (optional)
+                println("Failed to load replies.")
             }
     }
 
@@ -105,6 +114,9 @@ class UserProfileViewModel : ViewModel() {
                     repost?.let { repostsList.add(it) }
                 }
                 reposts.value = repostsList
+            }.addOnFailureListener {
+                // Handle failure to fetch reposts (optional)
+                println("Failed to load reposts.")
             }
     }
 }

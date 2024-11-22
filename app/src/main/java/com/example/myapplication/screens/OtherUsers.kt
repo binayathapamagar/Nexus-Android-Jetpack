@@ -6,15 +6,20 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.motionEventSpy
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -24,10 +29,9 @@ import coil.compose.AsyncImage
 import com.example.myapplication.Post
 import com.example.myapplication.R
 import com.example.myapplication.Reply
-import com.example.myapplication.ReplyItem
 import com.example.myapplication.UserProfileViewModel
 import com.example.myapplication.custom_color.color
-import com.google.android.play.integrity.internal.c
+import com.example.myapplication.utils.toRelativeTimeString
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,7 +52,7 @@ fun OtherUsers(
     val reposts = userProfileViewModel.reposts.value
     val isLoading = userProfileViewModel.isLoading.value
 
-    var selectedTabIndex by remember { mutableStateOf(0) }
+    var selectedTabIndex by remember { mutableIntStateOf(0) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         if (isLoading) {
@@ -60,7 +64,7 @@ fun OtherUsers(
                     title = { Text("") },
                     navigationIcon = {
                         IconButton(onClick = { navController.popBackStack() }) {
-                            Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                         }
                     }
                 )
@@ -167,12 +171,30 @@ fun OtherUsers(
                 when (selectedTabIndex) {
                     0 -> ContentList(posts, "No threads available") { post ->
                         PostItem(post)
+                        HorizontalDivider(
+                            modifier = Modifier.fillMaxWidth(),
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                        )
                     }
                     1 -> ContentList(replies, "No replies available") { reply ->
                         ReplyItem(reply)
+                        HorizontalDivider(
+                            modifier = Modifier.fillMaxWidth(),
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                        )
                     }
                     2 -> ContentList(reposts, "No reposts available") { repost ->
-                        RepostItem(repost)
+                        RepostItem(
+                            repost = repost,
+                            posts = posts
+                        )
+                        HorizontalDivider(
+                            modifier = Modifier.fillMaxWidth(),
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                        )
                     }
                 }
             }
@@ -212,161 +234,172 @@ fun <T> ContentList(
     }
 }
 
-// Post Item
 @Composable
-fun PostItem(post: Post) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Post Content
-            Text(
-                text = post.content,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+fun PostItem(
+    post: Post,
+    modifier: Modifier = Modifier
+) {
+    var isLiked by remember { mutableStateOf(false) }
+    val isReposted by remember { mutableStateOf(false) }
 
-            // Post User Info
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                AsyncImage(
-                    model = post.userProfileImageUrl.ifEmpty { "drawable/person" },
-                    contentDescription = "User Profile Image",
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape),
-                    contentScale = ContentScale.Crop
-                )
-                Spacer(modifier = Modifier.width(8.dp))
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+    ) {
+        // Post Header with three-dot options
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Post Header: User Profile Image and Name
+            AsyncImage(
+                model = post.userProfileImageUrl.ifEmpty { "drawable/person" },
+                contentDescription = "User Profile Image",
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop
+            )
+
+            Spacer(modifier = Modifier.width(8.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = post.userName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = post.timestamp.toRelativeTimeString(),
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Post Interactions: Likes and Reposts
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                IconButton(onClick = { /* Handle like action */ }) {
-                    Icon(Icons.Filled.Favorite, contentDescription = "Like")
-                }
-                Text(text = "${post.likes} Likes", style = MaterialTheme.typography.bodySmall)
-                IconButton(onClick = { /* Handle repost action */ }) {
-                    Icon(Icons.Filled.Share, contentDescription = "Repost")
-                }
-                Text(text = "${post.reposts} Reposts", style = MaterialTheme.typography.bodySmall)
+            // Three-dot options menu
+            IconButton(onClick = { /* Handle 3-dot options */ }) {
+                Icon(Icons.Filled.MoreVert, contentDescription = "More Options")
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
         }
-    }
-}
 
-// Reply Item
-@Composable
-fun ReplyItem(reply: Reply) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Original Post Content
-            Text(
-                text = "Replying to:",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = reply.content,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
-            // Reply User Info
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
+        // Post content
+        Text(post.content)
+
+        // Post Image (if available)
+        post.imageUrls.let {
+            if (it.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
                 AsyncImage(
-                    model = reply.userProfileImageUrl.ifEmpty { "drawable/person" },
-                    contentDescription = "Reply User Profile Image",
+                    model = it,
+                    contentDescription = "Post Image",
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape),
+                        .fillMaxWidth()
+                        .height(200.dp)
+                        .clip(RoundedCornerShape(8.dp)),
                     contentScale = ContentScale.Crop
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = reply.userName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            }
+        }
+
+        // Action buttons (Like, Share, Repost, Comment)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically, // Vertically center content
+
+
+        ) {
+            IconButton(onClick = { isLiked = !isLiked }) {
+                Icon(
+                    imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    contentDescription = "Like",
+                    tint = if (isLiked) Color.Red else MaterialTheme.colorScheme.onSurface
+
+                )
+
+            }
+            Text(
+                text = "${post.likes}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                modifier = Modifier.padding(end = 16.dp)
+            )
+            IconButton(onClick = { /* Handle repost */ }) {
+                Icon(
+                    imageVector = if (isReposted) Icons.Filled.Repeat else Icons.Outlined.Repeat,
+                    contentDescription = "Repost",
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(22.dp)
+                )
+
+            }
+            Text(
+                text = "${post.reposts}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                modifier = Modifier.padding(end = 16.dp)
+            )
+            IconButton(onClick = { /* Handle comment */ }) {
+                Icon(Icons.Outlined.ChatBubbleOutline, contentDescription = "Comment",
+                    modifier = Modifier.size(22.dp))
+
+
+            }
+            Text(
+                text = "${post.comments}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                modifier = Modifier.padding(end = 16.dp)
+            )
+            IconButton(onClick = { /* Handle share */ }) {
+                Icon(Icons.Filled.Share, contentDescription = "Share",
+                        modifier = Modifier.size(22.dp)
                 )
             }
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Reply Timestamp
-            Text(
-                text = "Posted at: ${reply.timestamp}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
         }
     }
 }
 
-// Repost Item
 @Composable
-fun RepostItem(repost: Repost) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Repost Header
-            Text(
-                text = "Reposted by ${repost.repostedByUserName}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.primary,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Reposted Content
-            Text(
-                text = "Original Post ID: ${repost.originalPostId}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Repost Timestamp
-            Text(
-                text = "Reposted at: ${repost.timestamp}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-            )
-        }
+fun ReplyItem(reply: Reply) {
+    Column(modifier = Modifier.padding(16.dp)) {
+        Text(
+            text = reply.content,
+            style = MaterialTheme.typography.bodyMedium
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "Replied by: ${reply.userName}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+        )
     }
 }
 
+@Composable
+fun RepostItem(repost: Repost, posts: List<Post>) {
+    Column(modifier = Modifier.padding(16.dp)) {
+        // Show repost content
+        Text(
+            text = repost.repostedByUserName,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = repost.originalPost.content,
+            style = MaterialTheme.typography.bodyMedium
+        )
+
+        // Display posts (if you want to show posts related to the repost)
+        posts.forEach { post ->
+            Text(text = post.content, style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
 
 
 // UserProfile model
@@ -377,10 +410,7 @@ data class UserProfile(
     val bio: String = "", // Short bio
     var profileImageUrl: String = "", // URL to the user's profile image
     val followersCount: Int = 0 // Number of followers
-) {
-    // Required for Firebase deserialization
-    constructor() : this("", "", "", "", "", 0)
-}
+)
 
 // Post model
 data class Post(
@@ -404,7 +434,6 @@ data class Reply(
     val content: String = "", // Reply content
     val userId: String = "", // ID of the user who made the reply
     val userName: String = "", // Name of the reply creator
-    val userProfileImageUrl: String = "", // Profile image URL of the reply creator
     val timestamp: String = "" // Timestamp of the reply
 )
 
@@ -414,5 +443,7 @@ data class Repost(
     val originalPostId: String = "", // ID of the original post being reposted
     val repostedByUserId: String = "", // ID of the user who reposted
     val repostedByUserName: String = "", // Username of the user who reposted
-    val timestamp: String = "" // Timestamp of the repost
+    val timestamp: String = "",// Timestamp of the repost
+    val originalPost: com.example.myapplication.screens.Post // Content of the original post
+
 )

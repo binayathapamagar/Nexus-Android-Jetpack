@@ -142,6 +142,13 @@ fun MainContainer(
                     authViewModel = authViewModel
                 )
             }
+            composable("otherUsers/{userId}") { backStackEntry ->
+                val userId = backStackEntry.arguments?.getString("userId") ?: ""
+                OtherUsers(
+                    navController = navController,
+                    userId = userId,
+                )
+            }
         }
     }
 }

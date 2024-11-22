@@ -272,7 +272,7 @@ fun Profile(
                                 post = post,
                                 postViewModel = postViewModel,
                                 navController = parentNavController,
-                                modifier = Modifier.padding(horizontal = 16.dp)
+                                modifier = Modifier.padding(horizontal = 8.dp)
                             )
                             HorizontalDivider(
                                 modifier = Modifier.fillMaxWidth(),
@@ -320,21 +320,3 @@ fun Profile(
         }
     }
 }
-
-//@Composable
-//fun RepostsTab(
-//    posts: List<Post>,
-//    postViewModel: PostViewModel,
-//    navController: NavController
-//) {
-//    LazyColumn {
-//        items(posts) { post ->
-//            PostItem(
-//                post = post,
-//                postViewModel = postViewModel,
-//                navController = navController
-//            )
-//            HorizontalDivider()
-//        }
-//    }
-//}

@@ -121,8 +121,7 @@ fun UserRow(user: User, navController: NavController) {
                 .height(60.dp) // Reduced height for the row
                 .clickable {
                     // Navigate to the user's profile, passing the user ID
-                    val id = user.id
-                    navController.navigate("otherUsers/${id}")
+                    navController.navigate("otherUsers/${user.id}")
                 },
             verticalAlignment = Alignment.CenterVertically
         ) {

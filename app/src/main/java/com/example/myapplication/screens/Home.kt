@@ -73,6 +73,7 @@ fun Home(
                     painter = painterResource(id = R.drawable.logo),
                     contentDescription = "App Logo",
                     modifier = Modifier.size(40.dp)
+                        .padding(top = 8.dp)
                 )
             }
         }

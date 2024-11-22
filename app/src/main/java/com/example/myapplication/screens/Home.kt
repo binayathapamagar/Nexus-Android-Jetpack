@@ -33,6 +33,7 @@ import androidx.compose.ui.res.painterResource
 //import android.os.Vibrator
 import android.view.HapticFeedbackConstants
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -73,7 +74,6 @@ fun Home(
                     painter = painterResource(id = R.drawable.logo),
                     contentDescription = "App Logo",
                     modifier = Modifier.size(40.dp)
-                        .padding(top = 8.dp)
                 )
             }
         }
@@ -86,8 +86,10 @@ fun Home(
             NewPostSection(
                 profileImageUrl = profileImageUrl,
                 userName = userName ?: "User",
-                onNewPostClick = { navController.navigate("newPost") }
+                onNewPostClick = { navController.navigate(Routes.NEW_POST) },
+                onIconClick = { navController.navigate(Routes.NEW_POST) }
             )
+
 
             LazyColumn(
                 modifier = Modifier
@@ -117,6 +119,7 @@ fun NewPostSection(
     profileImageUrl: String?,
     userName: String,
     onNewPostClick: () -> Unit,
+    onIconClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -125,7 +128,12 @@ fun NewPostSection(
             .clickable(onClick = onNewPostClick)
             .padding(16.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onNewPostClick),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             AsyncImage(
                 model = profileImageUrl,
                 contentDescription = "Profile Picture",
@@ -136,7 +144,11 @@ fun NewPostSection(
                 error = painterResource(id = R.drawable.person)
             )
             Spacer(modifier = Modifier.width(12.dp))
-            Column {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onNewPostClick)
+            ) {
                 Text(
                     text = userName,
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
@@ -153,22 +165,74 @@ fun NewPostSection(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Icon(Icons.Default.Image, contentDescription = "Add Image",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-            Icon(Icons.Default.Camera, contentDescription = "Take Photo",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-            Icon(Icons.Default.Gif, contentDescription = "Add GIF",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-            Icon(Icons.Default.Mic, contentDescription = "Voice Recording",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-            Icon(Icons.Default.Tag, contentDescription = "Add Hashtag",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-            Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Add List",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-            Icon(Icons.Default.LocationOn, contentDescription = "Add Location",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+            // Updated icon buttons to use IconButton for better touch feedback
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Image,
+                    contentDescription = "Add Image",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Camera,
+                    contentDescription = "Take Photo",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Gif,
+                    contentDescription = "Add GIF",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Mic,
+                    contentDescription = "Voice Recording",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Tag,
+                    contentDescription = "Add Hashtag",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.AutoMirrored.Filled.List,
+                    contentDescription = "Add List",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.LocationOn,
+                    contentDescription = "Add Location",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
         }
     }
+}
+
+
+@Composable
+private fun ActionIcon(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    Icon(
+        icon,
+        contentDescription = contentDescription,
+        modifier = Modifier
+            .clickable(onClick = onClick),
+        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+    )
 }
 
 
@@ -239,6 +303,11 @@ fun PostItem(
         animationSpec = tween(durationMillis = 300),
         label = ""
     )
+
+    // Effect to keep repost state updated
+    LaunchedEffect(post) {
+        isReposted = post.isRepostedByCurrentUser
+    }
 
     Column(
         modifier = modifier
@@ -375,8 +444,8 @@ fun PostItem(
                     if (isReposted) {
                         showRepostDialog = true
                     } else {
-                        isReposted = true
                         postViewModel.repostPost(post.id)
+                        isReposted = true
                         haptic.performHapticFeedback(view)
                     }
                 },
@@ -432,7 +501,7 @@ fun PostItem(
         }
     }
 
-    // Repost dialog
+    // Repost removal dialog
     if (showRepostDialog) {
         AlertDialog(
             onDismissRequest = { showRepostDialog = false },
@@ -449,44 +518,8 @@ fun PostItem(
             confirmButton = {
                 Button(
                     onClick = {
-                        isReposted = false
                         postViewModel.undoRepost(post.id)
-                        showRepostDialog = false
-                        haptic.performHapticFeedback(view)
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF4CAF50)
-                    )
-                ) {
-                    Text("Remove")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRepostDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
-    if (showRepostDialog) {
-        AlertDialog(
-            onDismissRequest = { showRepostDialog = false },
-            icon = {
-                Icon(
-                    Icons.Filled.Repeat,
-                    contentDescription = null,
-                    tint = Color(0xFF4CAF50),
-                    modifier = Modifier.size(32.dp)
-                )
-            },
-            title = { Text("Remove Repost?") },
-            text = { Text("This post will be removed from your profile's reposts.") },
-            confirmButton = {
-                Button(
-                    onClick = {
                         isReposted = false
-                        postViewModel.undoRepost(post.id)
                         showRepostDialog = false
                         haptic.performHapticFeedback(view)
                     },
@@ -515,6 +548,7 @@ fun PostItem(
     }
 }
 
+
 //// Haptic feedback function
 //private fun performHapticFeedback(context: Context) {
 //    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
@@ -525,9 +559,6 @@ fun PostItem(
 //        vibrator.vibrate(40)
 //    }
 //}
-
-
-
 
 
 

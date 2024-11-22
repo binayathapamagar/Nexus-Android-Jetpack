@@ -35,7 +35,16 @@ data class Post(
     val repostedBy: String? = null,
     val repostedByName: String? = null,
     val repostTimestamp: Date? = null,
-    val isRepostedByCurrentUser: Boolean = false
+    val isRepostedByCurrentUser: Boolean = false,
+    val repostStatus: RepostStatus = RepostStatus()
+)
+
+data class RepostStatus(
+    val isReposted: Boolean = false,
+    val repostedBy: String? = null,
+    val repostedByName: String? = null,
+    val repostTimestamp: Date? = null,
+    val repostId: String? = null
 )
 
 class PostViewModel : ViewModel() {
@@ -161,19 +170,33 @@ class PostViewModel : ViewModel() {
                     .get()
                     .await()
 
+                // Fetch all reposts for current user first
+                val userRepostsSnapshot = firestore.collection("users")
+                    .document(currentUser.uid)
+                    .collection("reposts")
+                    .get()
+                    .await()
+
+                val userReposts = userRepostsSnapshot.documents.associate {
+                    it.getString("originalPostId") to RepostStatus(
+                        isReposted = true,
+                        repostedBy = it.getString("repostedByUserId"),
+                        repostedByName = it.getString("repostedByUserName"),
+                        repostTimestamp = it.getTimestamp("timestamp")?.toDate(),
+                        repostId = it.id
+                    )
+                }
+
                 val fetchedPosts = postsSnapshot.documents.mapNotNull { doc ->
                     doc.toObject(Post::class.java)?.let { post ->
-                        val likedBy = try {
-                            (doc.get("likedBy") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
-                        } catch (e: Exception) {
-                            emptyList()
-                        }
+                        val likedBy = (doc.get("likedBy") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
 
                         post.copy(
                             id = doc.id,
                             isLikedByCurrentUser = likedBy.contains(currentUser.uid),
                             likedBy = likedBy,
-                            likes = likedBy.size
+                            likes = likedBy.size,
+                            repostStatus = userReposts[doc.id] ?: RepostStatus()
                         )
                     }
                 }
@@ -259,11 +282,23 @@ class PostViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val currentUser = auth.currentUser ?: return@launch
+
+                // Check if post is already reposted by current user
+                val existingRepost = firestore.collection("reposts")
+                    .whereEqualTo("originalPostId", postId)
+                    .whereEqualTo("repostedByUserId", currentUser.uid)
+                    .get()
+                    .await()
+
+                if (!existingRepost.isEmpty) {
+                    // Post is already reposted - this shouldn't create a new repost
+                    return@launch
+                }
+
                 val postRef = firestore.collection("posts").document(postId)
                 val userDoc = firestore.collection("users").document(currentUser.uid).get().await()
                 val userName = userDoc.getString("fullName") ?: currentUser.displayName ?: "Unknown User"
 
-                // Create repost document with timestamp
                 val repostId = UUID.randomUUID().toString()
                 val timestamp = FieldValue.serverTimestamp()
                 val repost = hashMapOf(
@@ -274,16 +309,12 @@ class PostViewModel : ViewModel() {
                     "timestamp" to timestamp
                 )
 
-                // Use a batch write for atomicity
                 firestore.runBatch { batch ->
-                    // Add repost to reposts collection
+                    // Add repost document
                     batch.set(firestore.collection("reposts").document(repostId), repost)
 
-                    // Increment repost count and update post
-                    batch.update(postRef, mapOf(
-                        "reposts" to FieldValue.increment(1),
-                        "isRepostedByCurrentUser" to true
-                    ))
+                    // Increment repost count
+                    batch.update(postRef, "reposts", FieldValue.increment(1))
 
                     // Add to user's reposts collection
                     batch.set(
@@ -295,7 +326,7 @@ class PostViewModel : ViewModel() {
                     )
                 }.await()
 
-                // Update local state immediately
+                // Update local state
                 _posts.value = _posts.value.map { post ->
                     if (post.id == postId) {
                         post.copy(
@@ -305,17 +336,17 @@ class PostViewModel : ViewModel() {
                     } else post
                 }
 
-                // Fetch updated reposts
-                fetchUserReposts(currentUser.uid)
-
-                // Create notification
                 createNotification(postId, "repost")
 
+                // Fetch updated reposts to ensure UI is in sync
+                fetchUserReposts(currentUser.uid)
+
             } catch (e: Exception) {
-                Log.e("PostViewModel", "Error creating repost: ${e.message}", e)
+                Log.e("PostViewModel", "Error creating repost: ${e.message}")
             }
         }
     }
+
 
     private suspend fun createNotification(postId: String, type: String) {
         try {
@@ -619,14 +650,38 @@ class PostViewModel : ViewModel() {
     fun deleteReply(postId: String, replyId: String) {
         viewModelScope.launch {
             try {
+                // Delete the reply document
                 firestore.collection("posts")
                     .document(postId)
                     .collection("comments")
                     .document(replyId)
                     .delete()
-                fetchReplies(postId)
+                    .await()
+
+                // Update the comments count on the post
+                firestore.collection("posts")
+                    .document(postId)
+                    .update("comments", FieldValue.increment(-1))
+                    .await()
+
+                // Update local state for replies
+                _replies.value = _replies.value.filter { it.id != replyId }
+
+                // Update local state for posts to reflect the new comment count
+                _posts.value = _posts.value.map { post ->
+                    if (post.id == postId) {
+                        post.copy(comments = (post.comments - 1).coerceAtLeast(0))
+                    } else {
+                        post
+                    }
+                }
+
+                // Update user replies if we're in the profile view
+                _userReplies.value = _userReplies.value.filter { (_, reply) -> reply.id != replyId }
+
+                Log.d("PostViewModel", "Reply deleted successfully")
             } catch (e: Exception) {
-                Log.e("PostViewModel", "Error deleting reply: ${e.message}")
+                Log.e("PostViewModel", "Error deleting reply: ${e.message}", e)
             }
         }
     }
@@ -652,10 +707,7 @@ class PostViewModel : ViewModel() {
                         batch.delete(firestore.collection("reposts").document(repostDoc.id))
 
                         // Decrement repost count
-                        batch.update(postRef, mapOf(
-                            "reposts" to FieldValue.increment(-1),
-                            "isRepostedByCurrentUser" to false
-                        ))
+                        batch.update(postRef, "reposts", FieldValue.increment(-1))
 
                         // Remove from user's reposts
                         batch.delete(
@@ -670,13 +722,13 @@ class PostViewModel : ViewModel() {
                     _posts.value = _posts.value.map { post ->
                         if (post.id == postId) {
                             post.copy(
-                                reposts = post.reposts - 1,
+                                reposts = (post.reposts - 1).coerceAtLeast(0),
                                 isRepostedByCurrentUser = false
                             )
                         } else post
                     }
 
-                    // Remove the post from userReposts if we're in the profile view
+                    // Update userReposts if we're in the profile view
                     _userReposts.value = _userReposts.value.filter { it.id != postId }
 
                     // Fetch updated reposts
@@ -684,7 +736,7 @@ class PostViewModel : ViewModel() {
                 }
 
             } catch (e: Exception) {
-                Log.e("PostViewModel", "Error removing repost: ${e.message}", e)
+                Log.e("PostViewModel", "Error removing repost: ${e.message}")
             }
         }
     }
@@ -692,6 +744,7 @@ class PostViewModel : ViewModel() {
     fun fetchUserReposts(userId: String) {
         viewModelScope.launch {
             try {
+                val currentUser = auth.currentUser ?: return@launch
                 val repostsSnapshot = firestore.collection("users")
                     .document(userId)
                     .collection("reposts")
@@ -703,26 +756,47 @@ class PostViewModel : ViewModel() {
 
                 for (repostDoc in repostsSnapshot.documents) {
                     val originalPostId = repostDoc.getString("originalPostId") ?: continue
-                    val originalPost = firestore.collection("posts")
+                    val originalPostDoc = firestore.collection("posts")
                         .document(originalPostId)
                         .get()
                         .await()
-                        .toObject(Post::class.java)
-                        ?.copy(
-                            isRepost = true,
+
+                    val post = originalPostDoc.toObject(Post::class.java)?.copy(
+                        id = originalPostId,
+                        repostStatus = RepostStatus(
+                            isReposted = true,
                             repostedBy = repostDoc.getString("repostedByUserId"),
                             repostedByName = repostDoc.getString("repostedByUserName"),
-                            repostTimestamp = repostDoc.getTimestamp("timestamp")?.toDate()
+                            repostTimestamp = repostDoc.getTimestamp("timestamp")?.toDate(),
+                            repostId = repostDoc.id
                         )
+                    )
 
-                    originalPost?.let { repostedPosts.add(it) }
+                    post?.let { repostedPosts.add(it) }
                 }
 
                 _userReposts.value = repostedPosts
-
             } catch (e: Exception) {
-                Log.e("PostViewModel", "Error fetching user reposts: ${e.message}", e)
+                Log.e("PostViewModel", "Error fetching user reposts: ${e.message}")
+            }
+        }
+    }
+    fun isPostRepostedByUser(postId: String, callback: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            try {
+                val currentUser = auth.currentUser ?: return@launch
+                val repostQuery = firestore.collection("reposts")
+                    .whereEqualTo("originalPostId", postId)
+                    .whereEqualTo("repostedByUserId", currentUser.uid)
+                    .get()
+                    .await()
+
+                callback(!repostQuery.isEmpty)
+            } catch (e: Exception) {
+                Log.e("PostViewModel", "Error checking repost status: ${e.message}")
+                callback(false)
             }
         }
     }
 }
+

@@ -23,6 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.example.myapplication.components.CustomIcon
+import com.example.myapplication.components.CustomIconType
 import com.example.myapplication.screens.PostItem
 import com.example.myapplication.utils.toRelativeTimeString
 
@@ -38,7 +40,8 @@ data class Reply(
     val replies: Int = 0,
     val reposts: Int = 0,
     val isLikedByCurrentUser: Boolean = false,
-    val likedBy: List<String> = emptyList()
+    val likedBy: List<String> = emptyList(),
+    val mentionedUsers: List<String> = emptyList() // Added this field
 )
 
 
@@ -136,9 +139,9 @@ fun ReplyItem(
                 onClick = { showOptionsMenu = true },
                 modifier = Modifier.size(40.dp)
             ) {
-                Icon(
-                    Icons.Default.MoreVert,
-                    contentDescription = "More options"
+                CustomIcon(
+                    iconType = CustomIconType.SETTINGS,
+                    modifier = Modifier.size(24.dp)
                 )
             }
         }

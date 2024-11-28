@@ -22,6 +22,7 @@ import coil.compose.AsyncImage
 import com.example.myapplication.R
 import com.example.myapplication.PostViewModel
 import com.example.myapplication.AuthViewModel
+import com.example.myapplication.ui.theme.AppColors
 import kotlinx.coroutines.launch
 
 @Composable
@@ -221,7 +222,10 @@ fun Reply(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AppColors.Primary,
+                    contentColor = AppColors.White
+                )
             ) {
                 if (isPosting) {
                     CircularProgressIndicator(

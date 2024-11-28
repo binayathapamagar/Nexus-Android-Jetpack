@@ -18,7 +18,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,7 +32,6 @@ import androidx.compose.ui.res.painterResource
 //import android.os.Vibrator
 import android.view.HapticFeedbackConstants
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -46,7 +44,10 @@ import com.example.myapplication.AuthViewModel
 import com.example.myapplication.Post
 import com.example.myapplication.PostViewModel
 import com.example.myapplication.R
+import com.example.myapplication.components.CustomIcon
+import com.example.myapplication.components.CustomIconType
 import com.example.myapplication.navigation.Routes
+import com.example.myapplication.ui.theme.AppColors
 import com.example.myapplication.utils.toRelativeTimeString
 
 //@OptIn(ExperimentalMaterial3Api::class)
@@ -65,16 +66,24 @@ fun Home(
     }
 
     Scaffold(
+        containerColor = AppColors.Background,
         topBar = {
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
+            Surface(
+                color = AppColors.Surface,
+                tonalElevation = 0.dp
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.logo),
-                    contentDescription = "App Logo",
-                    modifier = Modifier.size(40.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.logo),
+                        contentDescription = "App Logo",
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
             }
         }
     ) { innerPadding ->
@@ -83,13 +92,17 @@ fun Home(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            NewPostSection(
-                profileImageUrl = profileImageUrl,
-                userName = userName ?: "User",
-                onNewPostClick = { navController.navigate(Routes.NEW_POST) },
-                onIconClick = { navController.navigate(Routes.NEW_POST) }
-            )
-
+            Surface(
+                color = AppColors.Surface,
+                tonalElevation = 0.dp
+            ) {
+                NewPostSection(
+                    profileImageUrl = profileImageUrl,
+                    userName = userName ?: "User",
+                    onNewPostClick = { navController.navigate(Routes.NEW_POST) },
+                    onIconClick = { navController.navigate(Routes.NEW_POST) }
+                )
+            }
 
             LazyColumn(
                 modifier = Modifier
@@ -97,16 +110,21 @@ fun Home(
                     .fillMaxWidth()
             ) {
                 items(posts) { post ->
-                    PostItem(
-                        post = post,
-                        postViewModel = postViewModel,
-                        navController = navController,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
+                    Surface(
+                        color = AppColors.Surface,
+                        tonalElevation = 0.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        PostItem(
+                            post = post,
+                            postViewModel = postViewModel,
+                            navController = navController,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
                     HorizontalDivider(
-                        modifier = Modifier.fillMaxWidth(),
                         thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                        color = AppColors.Divider
                     )
                 }
             }
@@ -220,20 +238,20 @@ fun NewPostSection(
 }
 
 
-@Composable
-private fun ActionIcon(
-    icon: ImageVector,
-    contentDescription: String,
-    onClick: () -> Unit
-) {
-    Icon(
-        icon,
-        contentDescription = contentDescription,
-        modifier = Modifier
-            .clickable(onClick = onClick),
-        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-    )
-}
+//@Composable
+//private fun ActionIcon(
+//    icon: ImageVector,
+//    contentDescription: String,
+//    onClick: () -> Unit
+//) {
+//    Icon(
+//        icon,
+//        contentDescription = contentDescription,
+//        modifier = Modifier
+//            .clickable(onClick = onClick),
+//        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+//    )
+//}
 
 
 @Composable
@@ -334,11 +352,12 @@ fun PostItem(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
-                    Text(post.userName, fontWeight = FontWeight.Bold)
+                    Text(post.userName, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
                     Text(
                         text = post.timestamp.toRelativeTimeString(),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = AppColors.TextSecondary
+
                     )
                 }
             }
@@ -346,24 +365,12 @@ fun PostItem(
                 onClick = { showOptionsMenu = true },
                 modifier = Modifier.size(40.dp)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    repeat(3) {
-                        Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .background(
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    shape = CircleShape
-                                )
-                        )
-                        if (it != 2) Spacer(modifier = Modifier.height(2.dp))
-                    }
-                }
+                CustomIcon(
+                    iconType = CustomIconType.SETTINGS,
+                    modifier = Modifier.size(24.dp)
+                )
             }
-        }
+        }  // End of first Row
 
         Spacer(modifier = Modifier.height(8.dp))
         Text(post.content)
@@ -404,9 +411,8 @@ fun PostItem(
                 },
                 modifier = Modifier.size(40.dp)
             ) {
-                Icon(
-                    imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                    contentDescription = "Like",
+                CustomIcon(
+                    iconType = if (isLiked) CustomIconType.LIKE else CustomIconType.LIKE,
                     tint = if (isLiked) Color.Red else MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(22.dp)
                 )
@@ -414,7 +420,7 @@ fun PostItem(
             Text(
                 text = "${post.likes}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                color = AppColors.TextSecondary,
                 modifier = Modifier.padding(end = 16.dp)
             )
 
@@ -425,16 +431,15 @@ fun PostItem(
                 },
                 modifier = Modifier.size(40.dp)
             ) {
-                Icon(
-                    Icons.Outlined.ChatBubbleOutline,
-                    contentDescription = "Comment",
+                CustomIcon(
+                    iconType = CustomIconType.COMMENT,
                     modifier = Modifier.size(22.dp)
                 )
             }
             Text(
                 text = "${post.comments}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                color = AppColors.TextSecondary,
                 modifier = Modifier.padding(end = 16.dp)
             )
 
@@ -451,9 +456,8 @@ fun PostItem(
                 },
                 modifier = Modifier.size(40.dp)
             ) {
-                Icon(
-                    imageVector = if (isReposted) Icons.Filled.Repeat else Icons.Outlined.Repeat,
-                    contentDescription = if (isReposted) "Remove Repost" else "Repost",
+                CustomIcon(
+                    iconType = CustomIconType.REPOST,
                     tint = repostIconColor,
                     modifier = Modifier
                         .size(22.dp)
@@ -463,7 +467,7 @@ fun PostItem(
             Text(
                 text = "${post.reposts}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                color = AppColors.TextSecondary,
                 modifier = Modifier.padding(end = 16.dp)
             )
 
@@ -474,9 +478,8 @@ fun PostItem(
                 },
                 modifier = Modifier.size(40.dp)
             ) {
-                Icon(
-                    Icons.Outlined.Share,
-                    contentDescription = "Share",
+                CustomIcon(
+                    iconType = CustomIconType.SHARE,
                     modifier = Modifier.size(22.dp)
                 )
             }
@@ -549,6 +552,7 @@ fun PostItem(
 }
 
 
+
 //// Haptic feedback function
 //private fun performHapticFeedback(context: Context) {
 //    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
@@ -573,13 +577,18 @@ fun FullScreenImageViewer(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
+            // Horizontal pager for displaying images
             HorizontalPager(
                 state = pagerState
             ) { page ->
@@ -591,6 +600,7 @@ fun FullScreenImageViewer(
                 )
             }
 
+            // Close button at the top right
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier
@@ -598,12 +608,13 @@ fun FullScreenImageViewer(
                     .padding(16.dp)
             ) {
                 Icon(
-                    Icons.Default.Close,
+                    imageVector = Icons.Default.Close,
                     contentDescription = "Close",
                     tint = Color.White
                 )
             }
 
+            // Page indicator at the bottom center
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)

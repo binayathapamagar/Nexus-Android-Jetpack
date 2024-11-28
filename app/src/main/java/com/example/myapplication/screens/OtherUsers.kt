@@ -30,7 +30,7 @@ import com.example.myapplication.Post
 import com.example.myapplication.R
 import com.example.myapplication.Reply
 import com.example.myapplication.UserProfileViewModel
-import com.example.myapplication.custom_color.color
+import com.example.myapplication.ui.theme.AppColors
 import com.example.myapplication.utils.toRelativeTimeString
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -133,8 +133,8 @@ fun OtherUsers(
                             onClick = { /* Handle follow button */ },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = color.Black,
-                                contentColor = color.White
+                                containerColor = AppColors.Primary,
+                                contentColor = AppColors.White
                             ),
                             shape = RoundedCornerShape(8.dp)
                         ) {
@@ -174,7 +174,7 @@ fun OtherUsers(
                         HorizontalDivider(
                             modifier = Modifier.fillMaxWidth(),
                             thickness = 1.dp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                            color = AppColors.Divider
                         )
                     }
                     1 -> ContentList(replies, "No replies available") { reply ->
@@ -182,7 +182,7 @@ fun OtherUsers(
                         HorizontalDivider(
                             modifier = Modifier.fillMaxWidth(),
                             thickness = 1.dp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                            color = AppColors.Divider
                         )
                     }
                     2 -> ContentList(reposts, "No reposts available") { repost ->
@@ -193,7 +193,7 @@ fun OtherUsers(
                         HorizontalDivider(
                             modifier = Modifier.fillMaxWidth(),
                             thickness = 1.dp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                            color = AppColors.Divider
                         )
                     }
                 }

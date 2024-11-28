@@ -28,7 +28,7 @@ import coil.compose.AsyncImage
 import com.example.myapplication.AuthViewModel
 import com.example.myapplication.PostViewModel
 import com.example.myapplication.R
-import com.example.myapplication.custom_color.color
+import com.example.myapplication.ui.theme.AppColors
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -90,9 +90,9 @@ fun Profile(
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = color.White,
-                navigationIconContentColor = color.Black,
-                actionIconContentColor = color.Black
+                containerColor = AppColors.Surface,
+                titleContentColor = AppColors.TextPrimary,
+                navigationIconContentColor = AppColors.TextPrimary
             )
         )
 
@@ -188,8 +188,8 @@ fun Profile(
                                 },
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = color.White,
-                                    contentColor = color.Black
+                                    containerColor = AppColors.Primary,
+                                    contentColor = AppColors.White
                                 ),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
@@ -199,8 +199,8 @@ fun Profile(
                                 onClick = { showShareSheet = true },
                                 modifier = Modifier.weight(1f),
                                 colors = ButtonDefaults.buttonColors(
-                                    containerColor = color.White,
-                                    contentColor = color.Black
+                                    containerColor = AppColors.Primary,
+                                    contentColor = AppColors.White
                                 ),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
@@ -215,18 +215,18 @@ fun Profile(
                 // Sticky Header
                 stickyHeader {
                     Surface(
-                        color = color.White,
+                        contentColor = AppColors.White,
                         modifier = Modifier.fillMaxWidth(),
                         shadowElevation = if (isScrolled) 1.dp else 0.dp
                     ) {
                         TabRow(
                             selectedTabIndex = selectedTab,
-                            containerColor = color.White,
-                            contentColor = color.Black,
+                            containerColor = AppColors.Surface,
+                            contentColor = AppColors.TextPrimary,
                             divider = {
                                 HorizontalDivider(
                                     thickness = 1.dp,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                                    color = AppColors.Divider
                                 )
                             }
                         ) {
@@ -277,7 +277,7 @@ fun Profile(
                             HorizontalDivider(
                                 modifier = Modifier.fillMaxWidth(),
                                 thickness = 1.dp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                                color = AppColors.Divider
                             )
                         }
                     }
@@ -293,7 +293,7 @@ fun Profile(
                             HorizontalDivider(
                                 modifier = Modifier.fillMaxWidth(),
                                 thickness = 1.dp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                                color = AppColors.Divider
                             )
                         }
                     }
@@ -311,7 +311,7 @@ fun Profile(
                             HorizontalDivider(
                                 modifier = Modifier.fillMaxWidth(),
                                 thickness = 1.dp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                                color = AppColors.Divider
                             )
                         }
                     }

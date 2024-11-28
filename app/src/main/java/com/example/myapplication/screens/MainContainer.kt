@@ -1,17 +1,9 @@
 package com.example.myapplication.screens
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -19,11 +11,11 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
 import com.example.myapplication.AuthViewModel
-import com.example.myapplication.NotificationViewModel
 import com.example.myapplication.PostViewModel
-import com.example.myapplication.R
+import com.example.myapplication.components.CustomIcon
+import com.example.myapplication.components.CustomIconType
+import com.example.myapplication.viewmodels.NotificationViewModel
 
 @Composable
 fun MainContainer(
@@ -53,21 +45,23 @@ fun MainContainer(
                     NavigationBarItem(
                         icon = {
                             when (screen) {
-                                "home" -> Icon(Icons.Filled.Home, contentDescription = "Home")
-                                "search" -> Icon(Icons.Filled.Search, contentDescription = "Search")
-                                "newPost" -> Icon(Icons.Filled.Add, contentDescription = "New Post")
-                                "activity" -> AnimatedNotificationIcon(hasNewNotifications)
-                                "profile" -> AsyncImage(
-                                    model = profileImageUrl,
-                                    contentDescription = "Profile",
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .clip(CircleShape),
-                                    contentScale = ContentScale.Crop,
-                                    error = painterResource(id = R.drawable.person)
+                                "home" -> CustomIcon(CustomIconType.HOME)
+                                "search" -> CustomIcon(CustomIconType.SEARCH)
+                                "newPost" -> CustomIcon(CustomIconType.ADD)
+                                "activity" -> {
+                                    if (hasNewNotifications) {
+                                        CustomIcon(CustomIconType.NOTIFICATION)
+                                    } else {
+                                        CustomIcon(CustomIconType.NOTIFICATION_INACTIVE)
+                                    }
+                                }
+                                "profile" -> CustomIcon(
+                                    iconType = CustomIconType.PROFILE,
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
                         },
+
                         selected = currentRoute == screen,
                         onClick = {
                             if (currentRoute != screen) {
@@ -115,7 +109,8 @@ fun MainContainer(
             }
             composable("activity") {
                 Activity(
-                    notificationViewModel = notificationViewModel
+                    navController = navController,
+                    notificationViewModel = viewModel()
                 )
                 LaunchedEffect(Unit) {
                     notificationViewModel.markAllNotificationsAsRead()

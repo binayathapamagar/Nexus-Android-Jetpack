@@ -77,11 +77,17 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
             )
         }
 
+        // Update MyAppNavigation composable to handle parentReplyId parameter
         composable(
             route = Routes.REPLY,
             arguments = listOf(
                 navArgument("postId") { type = NavType.StringType },
-                navArgument("username") { type = NavType.StringType }
+                navArgument("username") { type = NavType.StringType },
+                navArgument("parentReplyId") {
+                    type = NavType.StringType
+                    defaultValue = ""  // Add default value
+                    nullable = true    // Make it nullable
+                }
             )
         ) { backStackEntry ->
             Reply(
@@ -89,7 +95,8 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
                 postViewModel = postViewModel,
                 authViewModel = authViewModel,
                 postId = backStackEntry.arguments?.getString("postId") ?: "",
-                replyToUsername = backStackEntry.arguments?.getString("username") ?: ""
+                replyToUsername = backStackEntry.arguments?.getString("username") ?: "",
+                parentReplyId = backStackEntry.arguments?.getString("parentReplyId")?.takeIf { it.isNotEmpty() }
             )
         }
 

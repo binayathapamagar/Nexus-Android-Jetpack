@@ -5,8 +5,10 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.models.NotificationType
+import com.example.myapplication.screens.Reply
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -41,6 +43,8 @@ data class Post(
     val isRepostedByCurrentUser: Boolean = false,
     val repostStatus: RepostStatus = RepostStatus()
 )
+
+
 
 data class RepostStatus(
     val isReposted: Boolean = false,
@@ -358,32 +362,30 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    fun addReply(postId: String, replyContent: String) {
+    fun addReply(
+        postId: String,
+        replyContent: String,
+        imageUris: List<Uri> = emptyList(),
+        parentReplyId: String? = null
+    ) {
         viewModelScope.launch {
             try {
                 val currentUser = auth.currentUser ?: return@launch
+                val userSnapshot = database.getReference("users")
+                    .child(currentUser.uid)
+                    .get()
+                    .await()
 
-                // Fetch current user data from Realtime Database
-                val userSnapshot = withContext(Dispatchers.IO) {
-                    database.getReference("users")
-                        .child(currentUser.uid)
-                        .get()
-                        .await()
-                }
-
-                // Get user information
                 val userName = userSnapshot.child("fullName").getValue(String::class.java)
                     ?: currentUser.displayName
                     ?: "User"
-                val userProfileImageUrl =
-                    userSnapshot.child("profileImageUrl").getValue(String::class.java)
-                        ?: currentUser.photoUrl?.toString()
-                        ?: ""
+                val userProfileImageUrl = userSnapshot.child("profileImageUrl").getValue(String::class.java)
+                    ?: currentUser.photoUrl?.toString()
+                    ?: ""
 
-                // Parse mentioned users before creating the reply
-                val mentionedUsers = extractMentionedUsers(replyContent)
+                // Upload images if any
+                val imageUrls = uploadImages(imageUris)
 
-                // Create the reply document
                 val replyRef = firestore.collection("posts")
                     .document(postId)
                     .collection("comments")
@@ -395,49 +397,76 @@ class PostViewModel : ViewModel() {
                     "userName" to userName,
                     "userProfileImageUrl" to userProfileImageUrl,
                     "content" to replyContent,
+                    "imageUrls" to imageUrls,
                     "timestamp" to FieldValue.serverTimestamp(),
                     "likes" to 0,
                     "likedBy" to listOf<String>(),
-                    "mentionedUsers" to mentionedUsers
+                    "parentReplyId" to parentReplyId,
+                    "replies" to 0,  // Add this field for nested replies count
+                    "reposts" to 0   // Add this field for reposts count
                 )
 
-                // Start a batch write
-                val batch = firestore.batch()
+                // Use a transaction to ensure atomicity
+                firestore.runTransaction { transaction ->
+                    // Add the reply
+                    transaction.set(replyRef, reply)
 
-                // Add the reply
-                batch.set(replyRef, reply)
+                    // Update comments count
+                    val postRef = firestore.collection("posts").document(postId)
+                    transaction.update(postRef, "comments", FieldValue.increment(1))
 
-                // Update the comments count on the post
-                val postRef = firestore.collection("posts").document(postId)
-                batch.update(postRef, "comments", FieldValue.increment(1))
+                    // If this is a nested reply, update the parent reply's nested replies count
+                    if (parentReplyId != null) {
+                        val parentReplyRef = firestore.collection("posts")
+                            .document(postId)
+                            .collection("comments")
+                            .document(parentReplyId)
+                        transaction.update(parentReplyRef, "replies", FieldValue.increment(1))
+                    }
+                }.await()
 
-                // Commit the batch
-                withContext(Dispatchers.IO) {
-                    batch.commit().await()
+                // Create notification with proper type
+                if (parentReplyId != null) {
+                    createNotification(postId, NotificationType.REPLY)
+                } else {
+                    createNotification(postId, NotificationType.COMMENT)
                 }
 
                 // Update local state
-                _posts.value = _posts.value.map { post ->
-                    if (post.id == postId) {
-                        post.copy(comments = post.comments + 1)
-                    } else post
+                if (parentReplyId != null) {
+                    _replies.value = buildNestedReplies(_replies.value)
+                } else {
+                    fetchReplies(postId)
                 }
 
-                // Create notifications for post owner and mentioned users
-                createNotification(
-                    postId = postId,
-                    type = NotificationType.COMMENT,
-                    mentionedUserIds = mentionedUsers
-                )
-
-                Log.d("PostViewModel", "Reply added successfully")
             } catch (e: Exception) {
                 Log.e("PostViewModel", "Error adding reply: ${e.message}", e)
                 throw e
             }
         }
-
     }
+
+    // Helper function to build nested reply structure
+    private fun buildNestedReplies(replies: List<Reply>): List<Reply> {
+        val replyMap = replies.associateBy { it.id }.toMutableMap()
+        val rootReplies = mutableListOf<Reply>()
+
+        replies.forEach { reply ->
+            if (reply.parentReplyId != null) {
+                val parentReply = replyMap[reply.parentReplyId]
+                if (parentReply != null) {
+                    replyMap[reply.parentReplyId] = parentReply.copy(
+                        nestedReplies = parentReply.nestedReplies + reply
+                    )
+                }
+            } else {
+                rootReplies.add(reply)
+            }
+        }
+
+        return rootReplies.map { replyMap[it.id] ?: it }
+    }
+
 
     private suspend fun extractMentionedUsers(content: String): List<String> =
         withContext(Dispatchers.IO) {
@@ -538,6 +567,33 @@ class PostViewModel : ViewModel() {
             }
         }
     }
+    private suspend fun createReplyFromDocument(doc: DocumentSnapshot): Reply {
+        val userId = doc.getString("userId") ?: throw IllegalStateException("No userId found")
+        val content = doc.getString("content") ?: ""
+        val timestamp = doc.getTimestamp("timestamp")?.toDate()
+        val likedBy = (doc.get("likedBy") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+
+        val userSnapshot = database.getReference("users")
+            .child(userId)
+            .get()
+            .await()
+
+        val userName = userSnapshot.child("fullName").getValue(String::class.java) ?: "Unknown User"
+        val userProfileImageUrl = userSnapshot.child("profileImageUrl").getValue(String::class.java) ?: ""
+
+        return Reply(
+            id = doc.id,
+            userId = userId,
+            userName = userName,
+            userProfileImageUrl = userProfileImageUrl,
+            content = content,
+            timestamp = timestamp,
+            likes = likedBy.size,
+            isLikedByCurrentUser = auth.currentUser?.uid?.let { uid -> likedBy.contains(uid) } ?: false,
+            likedBy = likedBy,
+            nestedReplies = emptyList()
+        )
+    }
 
     fun fetchReplies(postId: String) {
         viewModelScope.launch {
@@ -550,56 +606,35 @@ class PostViewModel : ViewModel() {
                     .await()
 
                 val currentUser = auth.currentUser
-                val fetchedReplies = mutableListOf<Reply>()
-
-                for (doc in repliesSnapshot.documents) {
+                val allReplies = repliesSnapshot.documents.mapNotNull { doc ->
                     try {
-                        val userId = doc.getString("userId") ?: continue
+                        val userId = doc.getString("userId") ?: return@mapNotNull null
                         val content = doc.getString("content") ?: ""
                         val timestamp = doc.getTimestamp("timestamp")?.toDate()
-                        val likedBy = (doc.get("likedBy") as? List<*>)?.mapNotNull { it as? String }
-                            ?: emptyList()
+                        val likedBy = (doc.get("likedBy") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                        val imageUrls = (doc.get("imageUrls") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                        val parentReplyId = doc.getString("parentReplyId")
 
-                        // Fetch user data from Realtime Database
-                        val userSnapshot = database.getReference("users")
-                            .child(userId)
-                            .get()
-                            .await()
-
-                        val userName = userSnapshot.child("fullName").getValue(String::class.java)
-                            ?: "Unknown User"
-                        val userProfileImageUrl =
-                            userSnapshot.child("profileImageUrl").getValue(String::class.java) ?: ""
-
-                        Log.d(
-                            "PostViewModel",
-                            "Fetching user data for ID: $userId, Found name: $userName"
-                        )
-
-                        val reply = Reply(
+                        Reply(
                             id = doc.id,
                             userId = userId,
-                            userName = userName,
-                            userProfileImageUrl = userProfileImageUrl,
+                            userName = doc.getString("userName") ?: "Unknown User",
+                            userProfileImageUrl = doc.getString("userProfileImageUrl") ?: "",
                             content = content,
+                            imageUrls = imageUrls,
                             timestamp = timestamp,
                             likes = likedBy.size,
-                            isLikedByCurrentUser = currentUser?.uid?.let { uid ->
-                                likedBy.contains(
-                                    uid
-                                )
-                            } ?: false,
-                            likedBy = likedBy
+                            isLikedByCurrentUser = currentUser?.uid?.let { uid -> likedBy.contains(uid) } ?: false,
+                            likedBy = likedBy,
+                            parentReplyId = parentReplyId
                         )
-
-                        fetchedReplies.add(reply)
                     } catch (e: Exception) {
                         Log.e("PostViewModel", "Error parsing reply: ${e.message}", e)
+                        null
                     }
                 }
 
-                _replies.value = fetchedReplies
-                Log.d("PostViewModel", "Fetched ${fetchedReplies.size} replies")
+                _replies.value = buildNestedReplies(allReplies)
             } catch (e: Exception) {
                 Log.e("PostViewModel", "Error fetching replies: ${e.message}", e)
             }
@@ -825,14 +860,9 @@ class PostViewModel : ViewModel() {
         withContext(Dispatchers.IO) {
             try {
                 val currentUser = auth.currentUser ?: return@withContext
-                val userDoc = database.getReference("users")
-                    .child(currentUser.uid)
-                    .get()
-                    .await()
-
-                val senderName =
-                    userDoc.child("fullName").getValue(String::class.java) ?: return@withContext
-                val senderProfileUrl = userDoc.child("profileImageUrl").getValue(String::class.java)
+                val userDoc = firestore.collection("users").document(currentUser.uid).get().await()
+                val senderName = userDoc.getString("fullName") ?: return@withContext
+                val senderProfileUrl = userDoc.getString("profileImageUrl")
 
                 val postDoc = firestore.collection("posts").document(postId).get().await()
                 val post = postDoc.toObject(Post::class.java) ?: return@withContext
@@ -841,7 +871,8 @@ class PostViewModel : ViewModel() {
 
                 val batch = firestore.batch()
 
-                if (post.userId != currentUser.uid) {
+                // Create notification for the post's owner
+                if (type != NotificationType.MENTION && post.userId != currentUser.uid) {
                     val notificationRef = firestore.collection("notifications").document()
                     val notification = hashMapOf(
                         "id" to notificationRef.id,
@@ -849,7 +880,7 @@ class PostViewModel : ViewModel() {
                         "senderId" to currentUser.uid,
                         "senderName" to senderName,
                         "senderProfileUrl" to senderProfileUrl,
-                        "type" to type.name,
+                        "type" to type.name,  // Enum usage
                         "postId" to postId,
                         "postContent" to post.content,
                         "postImageUrl" to (post.imageUrls.firstOrNull() ?: ""),
@@ -859,17 +890,17 @@ class PostViewModel : ViewModel() {
                     batch.set(notificationRef, notification)
                 }
 
+                // Create mention notifications
                 mentionedUserIds.forEach { userId ->
                     if (userId != currentUser.uid) {
-                        val mentionNotificationRef =
-                            firestore.collection("notifications").document()
+                        val mentionNotificationRef = firestore.collection("notifications").document()
                         val mentionNotification = hashMapOf(
                             "id" to mentionNotificationRef.id,
                             "recipientId" to userId,
                             "senderId" to currentUser.uid,
                             "senderName" to senderName,
                             "senderProfileUrl" to senderProfileUrl,
-                            "type" to NotificationType.MENTION.name,
+                            "type" to NotificationType.MENTION.name,  // Explicit mention type
                             "postId" to postId,
                             "postContent" to post.content,
                             "postImageUrl" to (post.imageUrls.firstOrNull() ?: ""),
@@ -883,8 +914,9 @@ class PostViewModel : ViewModel() {
                 batch.commit().await()
                 Log.d("PostViewModel", "Notification(s) created successfully")
             } catch (e: Exception) {
-                Log.e("PostViewModel", "Error creating notification: ${e.message}")
+                Log.e("PostViewModel", "Error creating notification: ${e.message}", e)
             }
         }
     }
+
 }

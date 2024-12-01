@@ -27,6 +27,9 @@ fun CustomIcon(
         CustomIconType.NOTIFICATION_INACTIVE -> R.drawable.heart1
         CustomIconType.PROFILE -> R.drawable.user
         CustomIconType.BACK -> R.drawable.arrowleft
+        CustomIconType.LANGUAGE -> R.drawable.global
+        CustomIconType.MENU -> R.drawable.hambergermenu
+        CustomIconType.ARROW_BACK -> R.drawable.arrowleft
     }
 
     Icon(
@@ -49,5 +52,8 @@ enum class CustomIconType {
     NOTIFICATION,
     NOTIFICATION_INACTIVE,
     PROFILE,
-    BACK
+    BACK,
+    LANGUAGE,
+    MENU,
+    ARROW_BACK
 }

@@ -7,7 +7,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.FavoriteBorder
@@ -27,7 +26,6 @@ import coil.compose.AsyncImage
 import com.example.myapplication.Post
 import com.example.myapplication.PostViewModel
 import com.example.myapplication.R
-import com.example.myapplication.Reply
 import com.example.myapplication.components.CustomIcon
 import com.example.myapplication.components.CustomIconType
 import com.example.myapplication.navigation.Routes

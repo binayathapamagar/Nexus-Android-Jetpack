@@ -7,7 +7,8 @@ enum class NotificationType {
     COMMENT,
     FOLLOW,
     MENTION,
-    REPOST
+    REPOST,
+    REPLY
 }
 
 data class Notification(

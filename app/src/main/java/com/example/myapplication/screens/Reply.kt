@@ -1,7 +1,13 @@
 package com.example.myapplication.screens
 
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -14,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -46,15 +53,30 @@ fun Reply(
     postViewModel: PostViewModel,
     authViewModel: AuthViewModel,
     postId: String,
-    replyToUsername: String
+    replyToUsername: String,
+    parentReplyId: String? = null
 ) {
     var replyText by remember { mutableStateOf("") }
     var isPosting by remember { mutableStateOf(false) }
+    var selectedImages by remember { mutableStateOf<List<Uri>>(emptyList()) }
     val profileImageUrl by authViewModel.profileImageUrl.collectAsState()
     val userName by authViewModel.userName.collectAsState()
     val post by postViewModel.getPost(postId).collectAsState(initial = null)
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetMultipleContents()
+    ) { uris: List<Uri> ->
+        selectedImages = uris
+        uris.forEach { uri ->
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -95,7 +117,7 @@ fun Reply(
             ) {
                 post?.let { originalPost ->
                     Column(horizontalAlignment = Alignment.Start) {
-                        // First profile section
+                        // Original post content
                         Row(verticalAlignment = Alignment.Top) {
                             AsyncImage(
                                 model = originalPost.userProfileImageUrl,
@@ -123,11 +145,10 @@ fun Reply(
                             }
                         }
 
-                        // Centered vertical line
                         Box(
                             modifier = Modifier
-                                .padding(start = 19.dp)  // Center align with profile pics (40/2 - 1)
-                                .padding(vertical = 4.dp)  // Space from profile pics
+                                .padding(start = 19.dp)
+                                .padding(vertical = 4.dp)
                         ) {
                             VerticalLine()
                         }
@@ -180,12 +201,57 @@ fun Reply(
                                     enabled = !isPosting
                                 )
 
+                                // Selected images preview
+                                if (selectedImages.isNotEmpty()) {
+                                    LazyRow(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        items(selectedImages) { uri ->
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(100.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                            ) {
+                                                AsyncImage(
+                                                    model = uri,
+                                                    contentDescription = "Selected Image",
+                                                    modifier = Modifier.fillMaxSize(),
+                                                    contentScale = ContentScale.Crop
+                                                )
+                                                IconButton(
+                                                    onClick = {
+                                                        selectedImages = selectedImages.filter { it != uri }
+                                                    },
+                                                    modifier = Modifier
+                                                        .align(Alignment.TopEnd)
+                                                        .padding(4.dp)
+                                                        .size(24.dp)
+                                                        .background(
+                                                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                                                            shape = CircleShape
+                                                        )
+                                                ) {
+                                                    Icon(
+                                                        Icons.Default.Close,
+                                                        contentDescription = "Remove Image",
+                                                        modifier = Modifier.size(16.dp),
+                                                        tint = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    ActionButton(Icons.Default.Image, "Add Images") { /* TODO */ }
+                                    ActionButton(Icons.Default.Image, "Add Images") {
+                                        imagePickerLauncher.launch("image/*")
+                                    }
                                     ActionButton(Icons.Default.Camera, "Take Photo") { /* TODO */ }
                                     ActionButton(Icons.Default.Gif, "Add GIF") { /* TODO */ }
                                     ActionButton(Icons.Default.Mic, "Voice Recording") { /* TODO */ }
@@ -199,14 +265,18 @@ fun Reply(
                 }
             }
 
-            // Reply button
             Button(
                 onClick = {
                     if (replyText.isNotBlank()) {
                         isPosting = true
                         scope.launch {
                             try {
-                                postViewModel.addReply(postId, replyText)
+                                postViewModel.addReply(
+                                    postId = postId,
+                                    replyContent = replyText,
+                                    imageUris = selectedImages,
+                                    parentReplyId = parentReplyId
+                                )
                                 navController.navigateUp()
                             } catch (e: Exception) {
                                 snackbarHostState.showSnackbar(

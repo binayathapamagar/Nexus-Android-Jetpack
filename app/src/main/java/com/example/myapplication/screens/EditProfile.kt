@@ -103,7 +103,7 @@ fun EditProfile(
                             navController.popBackStack()
                         }
                     ) {
-                        Text("Done", color = AppColors.Primary)
+                        Text("Done", color = AppColors.Black)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

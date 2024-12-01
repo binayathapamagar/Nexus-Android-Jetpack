@@ -1,8 +1,6 @@
 package com.example.myapplication.screens
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -10,6 +8,9 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.myapplication.AuthState
 import com.example.myapplication.AuthViewModel
+import com.example.myapplication.components.CustomIcon
+import com.example.myapplication.components.CustomIconType
+import com.example.myapplication.ui.theme.AppColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,7 +32,6 @@ fun Settings(
             }
             is AuthState.Error -> {
                 isLoggingOut = false
-                // Show error message
                 snackbarHostState.showSnackbar((authState as AuthState.Error).message)
             }
             else -> {}
@@ -39,50 +39,69 @@ fun Settings(
     }
 
     Scaffold(
+        containerColor = AppColors.Surface,
         topBar = {
             TopAppBar(
-                title = { Text("Settings") },
+                title = {
+                    Text(
+                        "Settings",
+                        color = AppColors.TextPrimary
+                    )
+                },
                 navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back"
+                    IconButton(
+                        onClick = {
+                            navController.navigateUp() // This will go back to the previous screen
+                        }
+                    ) {
+                        CustomIcon(
+                            iconType = CustomIconType.ARROW_BACK,
+                            modifier = Modifier.size(24.dp)
                         )
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = AppColors.Surface,
+                    navigationIconContentColor = AppColors.TextPrimary
+                )
             )
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        Surface(
+            color = AppColors.Surface,
+            modifier = Modifier.fillMaxSize()
         ) {
-            // Add other settings options here
-
-            Spacer(modifier = Modifier.weight(1f))
-
-            Button(
-                onClick = {
-                    isLoggingOut = true
-                    authViewModel.logout()
-                },
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.error
-                ),
-                enabled = !isLoggingOut
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                if (isLoggingOut) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.onError,
-                        modifier = Modifier.size(24.dp)
-                    )
-                } else {
-                    Text("Logout")
+                // Add other settings options here
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                Button(
+                    onClick = {
+                        isLoggingOut = true
+                        authViewModel.logout()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = AppColors.Error
+                    ),
+                    enabled = !isLoggingOut
+                ) {
+                    if (isLoggingOut) {
+                        CircularProgressIndicator(
+                            color = AppColors.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    } else {
+                        Text("Logout", color = AppColors.White)
+                    }
                 }
             }
         }

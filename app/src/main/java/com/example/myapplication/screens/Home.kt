@@ -8,9 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -31,6 +29,7 @@ import androidx.compose.ui.res.painterResource
 //import android.os.VibrationEffect
 //import android.os.Vibrator
 import android.view.HapticFeedbackConstants
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -66,7 +65,7 @@ fun Home(
     }
 
     Scaffold(
-        containerColor = AppColors.Background,
+        containerColor = AppColors.White,
         topBar = {
             Surface(
                 color = AppColors.Surface,
@@ -322,7 +321,6 @@ fun PostItem(
         label = ""
     )
 
-    // Effect to keep repost state updated
     LaunchedEffect(post) {
         isReposted = post.isRepostedByCurrentUser
     }
@@ -330,9 +328,7 @@ fun PostItem(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clickable {
-                navController.navigate(Routes.createThreadRoute(post.id))
-            }
+            .clickable { navController.navigate(Routes.createThreadRoute(post.id)) }
             .padding(16.dp)
     ) {
         // Header section
@@ -357,7 +353,6 @@ fun PostItem(
                         text = post.timestamp.toRelativeTimeString(),
                         style = MaterialTheme.typography.bodySmall,
                         color = AppColors.TextSecondary
-
                     )
                 }
             }
@@ -370,28 +365,93 @@ fun PostItem(
                     modifier = Modifier.size(24.dp)
                 )
             }
-        }  // End of first Row
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
         Text(post.content)
 
-        // Image gallery
+        // Media Gallery
         if (post.imageUrls.isNotEmpty()) {
             Spacer(modifier = Modifier.height(8.dp))
-            LazyRow {
-                itemsIndexed(post.imageUrls) { index, imageUrl ->
+            when {
+                post.imageUrls.size == 1 -> {
                     AsyncImage(
-                        model = imageUrl,
-                        contentDescription = "Post Image",
+                        model = post.imageUrls[0],
+                        contentDescription = "Post Media",
                         modifier = Modifier
-                            .size(200.dp)
-                            .padding(end = 8.dp)
+                            .fillMaxWidth()
+                            .height(300.dp)
+                            .clip(RoundedCornerShape(12.dp))
                             .clickable {
-                                initialPage = index
+                                initialPage = 0
                                 showImageViewer = true
                             },
                         contentScale = ContentScale.Crop
                     )
+                }
+                post.imageUrls.size == 2 -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        post.imageUrls.forEachIndexed { index, url ->
+                            AsyncImage(
+                                model = url,
+                                contentDescription = "Post Media",
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(300.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        initialPage = index
+                                        showImageViewer = true
+                                    },
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    }
+                }
+                else -> {
+                    val firstRowWeight = if (post.imageUrls.size == 3) 2f else 1f
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        AsyncImage(
+                            model = post.imageUrls[0],
+                            contentDescription = "Post Media",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                                .weight(firstRowWeight)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    initialPage = 0
+                                    showImageViewer = true
+                                },
+                            contentScale = ContentScale.Crop
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            post.imageUrls.drop(1).take(3).forEachIndexed { index, url ->
+                                AsyncImage(
+                                    model = url,
+                                    contentDescription = "Post Media",
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(150.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            initialPage = index + 1
+                                            showImageViewer = true
+                                        },
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -403,7 +463,6 @@ fun PostItem(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Like button
             IconButton(
                 onClick = {
                     isLiked = !isLiked
@@ -424,7 +483,6 @@ fun PostItem(
                 modifier = Modifier.padding(end = 16.dp)
             )
 
-            // Comment button
             IconButton(
                 onClick = {
                     navController.navigate(Routes.createReplyRoute(post.id, post.userName))
@@ -443,7 +501,6 @@ fun PostItem(
                 modifier = Modifier.padding(end = 16.dp)
             )
 
-            // Repost button
             IconButton(
                 onClick = {
                     if (isReposted) {
@@ -471,11 +528,8 @@ fun PostItem(
                 modifier = Modifier.padding(end = 16.dp)
             )
 
-            // Share button
             IconButton(
-                onClick = {
-                    // Implement share functionality
-                },
+                onClick = { /* Implement share functionality */ },
                 modifier = Modifier.size(40.dp)
             ) {
                 CustomIcon(
@@ -485,12 +539,14 @@ fun PostItem(
             }
         }
 
-        // Options dialog
         if (showOptionsMenu) {
             AlertDialog(
                 onDismissRequest = { showOptionsMenu = false },
                 confirmButton = {
-                    TextButton(onClick = { postViewModel.deletePost(post.id); showOptionsMenu = false }) {
+                    TextButton(onClick = {
+                        postViewModel.deletePost(post.id)
+                        showOptionsMenu = false
+                    }) {
                         Text("Delete")
                     }
                 },
@@ -502,52 +558,50 @@ fun PostItem(
                 text = { Text("Do you want to delete this post?") }
             )
         }
-    }
 
-    // Repost removal dialog
-    if (showRepostDialog) {
-        AlertDialog(
-            onDismissRequest = { showRepostDialog = false },
-            icon = {
-                Icon(
-                    Icons.Filled.Repeat,
-                    contentDescription = null,
-                    tint = Color(0xFF4CAF50),
-                    modifier = Modifier.size(32.dp)
-                )
-            },
-            title = { Text("Remove Repost?") },
-            text = { Text("This post will be removed from your profile's reposts.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        postViewModel.undoRepost(post.id)
-                        isReposted = false
-                        showRepostDialog = false
-                        haptic.performHapticFeedback(view)
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF4CAF50)
+        if (showRepostDialog) {
+            AlertDialog(
+                onDismissRequest = { showRepostDialog = false },
+                icon = {
+                    Icon(
+                        Icons.Filled.Repeat,
+                        contentDescription = null,
+                        tint = Color(0xFF4CAF50),
+                        modifier = Modifier.size(32.dp)
                     )
-                ) {
-                    Text("Remove")
+                },
+                title = { Text("Remove Repost?") },
+                text = { Text("This post will be removed from your profile's reposts.") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            postViewModel.undoRepost(post.id)
+                            isReposted = false
+                            showRepostDialog = false
+                            haptic.performHapticFeedback(view)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF4CAF50)
+                        )
+                    ) {
+                        Text("Remove")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showRepostDialog = false }) {
+                        Text("Cancel")
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRepostDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
+            )
+        }
 
-    // Image viewer
-    if (showImageViewer) {
-        FullScreenImageViewer(
-            imageUrls = post.imageUrls,
-            initialPage = initialPage,
-            onDismiss = { showImageViewer = false }
-        )
+        if (showImageViewer) {
+            FullScreenImageViewer(
+                imageUrls = post.imageUrls,
+                initialPage = initialPage,
+                onDismiss = { showImageViewer = false }
+            )
+        }
     }
 }
 

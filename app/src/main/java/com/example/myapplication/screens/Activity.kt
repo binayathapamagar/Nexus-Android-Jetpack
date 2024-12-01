@@ -2,6 +2,7 @@ package com.example.myapplication.screens
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -35,14 +36,16 @@ import com.example.myapplication.utils.toRelativeTimeString
 fun Activity(
     modifier: Modifier = Modifier,
     notificationViewModel: NotificationViewModel = viewModel(),
-    navController: NavHostController // Add navigation controller
+    navController: NavHostController
 ) {
     val notifications by notificationViewModel.notifications.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("All", "Follows", "Replies", "Reposts")
 
     Column(
-        modifier = modifier.fillMaxSize()
+        modifier = modifier
+            .fillMaxSize()
+            .background(AppColors.White)
     ) {
         Text(
             text = "Activity",
@@ -51,22 +54,39 @@ fun Activity(
             modifier = Modifier.padding(16.dp)
         )
 
-        TabRow(
-            selectedTabIndex = selectedTab,
-            modifier = Modifier.fillMaxWidth(),
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .background(AppColors.White),
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             tabs.forEachIndexed { index, title ->
-                Tab(
-                    selected = selectedTab == index,
-                    onClick = { selectedTab = index },
-                    text = {
-                        Text(
-                            text = title,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
+                val isSelected = selectedTab == index
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 4.dp)
+                        .clip(MaterialTheme.shapes.medium)
+                        .background(
+                            if (isSelected) AppColors.Black else AppColors.White
                         )
-                    }
-                )
+                        .border(
+                            width = 1.dp,
+                            color = AppColors.Gray,
+                            shape = MaterialTheme.shapes.medium
+                        )
+                        .clickable { selectedTab = index }
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = title,
+                        color = if (isSelected) AppColors.White else AppColors.Black,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
 
@@ -97,14 +117,12 @@ fun Activity(
                         notification = notification,
                         onMarkAsRead = { notificationViewModel.markAsRead(notification.id) },
                         onNotificationClick = {
-                            // Navigate to post when notification is clicked
                             notification.postId?.let { postId ->
                                 navController.navigate("thread/$postId")
                             }
                         }
                     )
 
-                    // Add divider after each notification
                     HorizontalDivider(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -117,6 +135,7 @@ fun Activity(
         }
     }
 }
+
 
 @Composable
 fun NotificationItem(
@@ -168,6 +187,7 @@ fun NotificationItem(
                     NotificationType.FOLLOW -> "started following you"
                     NotificationType.MENTION -> "mentioned you"
                     NotificationType.REPOST -> "reposted your post"
+                    NotificationType.REPLY -> "replied to your comment"
                 },
                 style = MaterialTheme.typography.bodyMedium
             )
@@ -201,6 +221,7 @@ fun NotificationItem(
                     NotificationType.FOLLOW -> Icons.Filled.PersonAdd
                     NotificationType.MENTION -> Icons.Filled.AlternateEmail
                     NotificationType.REPOST -> Icons.Filled.Repeat
+                    NotificationType.REPLY -> Icons.Outlined.ChatBubbleOutline
                 },
                 contentDescription = null,
                 tint = when (notification.type) {

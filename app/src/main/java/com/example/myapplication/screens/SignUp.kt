@@ -29,6 +29,7 @@ import coil.compose.rememberAsyncImagePainter
 import com.example.myapplication.AuthState
 import com.example.myapplication.AuthViewModel
 import com.example.myapplication.R
+import com.example.myapplication.ui.theme.AppColors
 
 // Move this function outside of the SignUp composable
 fun openImagePicker(launcher: ActivityResultLauncher<Intent>) {
@@ -163,7 +164,8 @@ fun SignUp(modifier: Modifier = Modifier, navController: NavController, authView
                 authViewModel.signup(fullName, username, email, password, bio, profileImageUri)
             },
             modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
+            colors = ButtonDefaults.buttonColors(containerColor = AppColors.Black)
+
         ) {
             Text("Register")
         }

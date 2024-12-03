@@ -8,9 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -18,7 +16,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +29,7 @@ import androidx.compose.ui.res.painterResource
 //import android.os.VibrationEffect
 //import android.os.Vibrator
 import android.view.HapticFeedbackConstants
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -45,7 +43,10 @@ import com.example.myapplication.AuthViewModel
 import com.example.myapplication.Post
 import com.example.myapplication.PostViewModel
 import com.example.myapplication.R
+import com.example.myapplication.components.CustomIcon
+import com.example.myapplication.components.CustomIconType
 import com.example.myapplication.navigation.Routes
+import com.example.myapplication.ui.theme.AppColors
 import com.example.myapplication.utils.toRelativeTimeString
 
 //@OptIn(ExperimentalMaterial3Api::class)
@@ -64,17 +65,24 @@ fun Home(
     }
 
     Scaffold(
+        containerColor = AppColors.White,
         topBar = {
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
+            Surface(
+                color = AppColors.Surface,
+                tonalElevation = 0.dp
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.logo),
-                    contentDescription = "App Logo",
-                    modifier = Modifier.size(40.dp)
-                        .padding(top = 8.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.logo),
+                        contentDescription = "App Logo",
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
             }
         }
     ) { innerPadding ->
@@ -83,11 +91,17 @@ fun Home(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            NewPostSection(
-                profileImageUrl = profileImageUrl,
-                userName = userName ?: "User",
-                onNewPostClick = { navController.navigate("newPost") }
-            )
+            Surface(
+                color = AppColors.Surface,
+                tonalElevation = 0.dp
+            ) {
+                NewPostSection(
+                    profileImageUrl = profileImageUrl,
+                    userName = userName ?: "User",
+                    onNewPostClick = { navController.navigate(Routes.NEW_POST) },
+                    onIconClick = { navController.navigate(Routes.NEW_POST) }
+                )
+            }
 
             LazyColumn(
                 modifier = Modifier
@@ -95,16 +109,21 @@ fun Home(
                     .fillMaxWidth()
             ) {
                 items(posts) { post ->
-                    PostItem(
-                        post = post,
-                        postViewModel = postViewModel,
-                        navController = navController,
-                        modifier = Modifier.padding(horizontal = 16.dp)
-                    )
+                    Surface(
+                        color = AppColors.Surface,
+                        tonalElevation = 0.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        PostItem(
+                            post = post,
+                            postViewModel = postViewModel,
+                            navController = navController,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
                     HorizontalDivider(
-                        modifier = Modifier.fillMaxWidth(),
                         thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                        color = AppColors.Divider
                     )
                 }
             }
@@ -117,6 +136,7 @@ fun NewPostSection(
     profileImageUrl: String?,
     userName: String,
     onNewPostClick: () -> Unit,
+    onIconClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -125,7 +145,12 @@ fun NewPostSection(
             .clickable(onClick = onNewPostClick)
             .padding(16.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onNewPostClick),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             AsyncImage(
                 model = profileImageUrl,
                 contentDescription = "Profile Picture",
@@ -136,7 +161,11 @@ fun NewPostSection(
                 error = painterResource(id = R.drawable.person)
             )
             Spacer(modifier = Modifier.width(12.dp))
-            Column {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onNewPostClick)
+            ) {
                 Text(
                     text = userName,
                     style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
@@ -153,23 +182,75 @@ fun NewPostSection(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Icon(Icons.Default.Image, contentDescription = "Add Image",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-            Icon(Icons.Default.Camera, contentDescription = "Take Photo",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-            Icon(Icons.Default.Gif, contentDescription = "Add GIF",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-            Icon(Icons.Default.Mic, contentDescription = "Voice Recording",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-            Icon(Icons.Default.Tag, contentDescription = "Add Hashtag",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-            Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Add List",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
-            Icon(Icons.Default.LocationOn, contentDescription = "Add Location",
-                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+            // Updated icon buttons to use IconButton for better touch feedback
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Image,
+                    contentDescription = "Add Image",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Camera,
+                    contentDescription = "Take Photo",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Gif,
+                    contentDescription = "Add GIF",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Mic,
+                    contentDescription = "Voice Recording",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Tag,
+                    contentDescription = "Add Hashtag",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.AutoMirrored.Filled.List,
+                    contentDescription = "Add List",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.LocationOn,
+                    contentDescription = "Add Location",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
         }
     }
 }
+
+
+//@Composable
+//private fun ActionIcon(
+//    icon: ImageVector,
+//    contentDescription: String,
+//    onClick: () -> Unit
+//) {
+//    Icon(
+//        icon,
+//        contentDescription = contentDescription,
+//        modifier = Modifier
+//            .clickable(onClick = onClick),
+//        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+//    )
+//}
 
 
 @Composable
@@ -240,12 +321,14 @@ fun PostItem(
         label = ""
     )
 
+    LaunchedEffect(post) {
+        isReposted = post.isRepostedByCurrentUser
+    }
+
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clickable {
-                navController.navigate(Routes.createThreadRoute(post.id))
-            }
+            .clickable { navController.navigate(Routes.createThreadRoute(post.id)) }
             .padding(16.dp)
     ) {
         // Header section
@@ -265,11 +348,11 @@ fun PostItem(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
-                    Text(post.userName, fontWeight = FontWeight.Bold)
+                    Text(post.userName, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
                     Text(
                         text = post.timestamp.toRelativeTimeString(),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        color = AppColors.TextSecondary
                     )
                 }
             }
@@ -277,45 +360,98 @@ fun PostItem(
                 onClick = { showOptionsMenu = true },
                 modifier = Modifier.size(40.dp)
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    repeat(3) {
-                        Box(
-                            modifier = Modifier
-                                .size(4.dp)
-                                .background(
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    shape = CircleShape
-                                )
-                        )
-                        if (it != 2) Spacer(modifier = Modifier.height(2.dp))
-                    }
-                }
+                CustomIcon(
+                    iconType = CustomIconType.SETTINGS,
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
 
         Spacer(modifier = Modifier.height(8.dp))
         Text(post.content)
 
-        // Image gallery
+        // Media Gallery
         if (post.imageUrls.isNotEmpty()) {
             Spacer(modifier = Modifier.height(8.dp))
-            LazyRow {
-                itemsIndexed(post.imageUrls) { index, imageUrl ->
+            when {
+                post.imageUrls.size == 1 -> {
                     AsyncImage(
-                        model = imageUrl,
-                        contentDescription = "Post Image",
+                        model = post.imageUrls[0],
+                        contentDescription = "Post Media",
                         modifier = Modifier
-                            .size(200.dp)
-                            .padding(end = 8.dp)
+                            .fillMaxWidth()
+                            .height(300.dp)
+                            .clip(RoundedCornerShape(12.dp))
                             .clickable {
-                                initialPage = index
+                                initialPage = 0
                                 showImageViewer = true
                             },
                         contentScale = ContentScale.Crop
                     )
+                }
+                post.imageUrls.size == 2 -> {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        post.imageUrls.forEachIndexed { index, url ->
+                            AsyncImage(
+                                model = url,
+                                contentDescription = "Post Media",
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(300.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        initialPage = index
+                                        showImageViewer = true
+                                    },
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    }
+                }
+                else -> {
+                    val firstRowWeight = if (post.imageUrls.size == 3) 2f else 1f
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        AsyncImage(
+                            model = post.imageUrls[0],
+                            contentDescription = "Post Media",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(200.dp)
+                                .weight(firstRowWeight)
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    initialPage = 0
+                                    showImageViewer = true
+                                },
+                            contentScale = ContentScale.Crop
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            post.imageUrls.drop(1).take(3).forEachIndexed { index, url ->
+                                AsyncImage(
+                                    model = url,
+                                    contentDescription = "Post Media",
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(150.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            initialPage = index + 1
+                                            showImageViewer = true
+                                        },
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -327,7 +463,6 @@ fun PostItem(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Like button
             IconButton(
                 onClick = {
                     isLiked = !isLiked
@@ -335,9 +470,8 @@ fun PostItem(
                 },
                 modifier = Modifier.size(40.dp)
             ) {
-                Icon(
-                    imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                    contentDescription = "Like",
+                CustomIcon(
+                    iconType = if (isLiked) CustomIconType.LIKE else CustomIconType.LIKE,
                     tint = if (isLiked) Color.Red else MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(22.dp)
                 )
@@ -345,46 +479,42 @@ fun PostItem(
             Text(
                 text = "${post.likes}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                color = AppColors.TextSecondary,
                 modifier = Modifier.padding(end = 16.dp)
             )
 
-            // Comment button
             IconButton(
                 onClick = {
                     navController.navigate(Routes.createReplyRoute(post.id, post.userName))
                 },
                 modifier = Modifier.size(40.dp)
             ) {
-                Icon(
-                    Icons.Outlined.ChatBubbleOutline,
-                    contentDescription = "Comment",
+                CustomIcon(
+                    iconType = CustomIconType.COMMENT,
                     modifier = Modifier.size(22.dp)
                 )
             }
             Text(
                 text = "${post.comments}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                color = AppColors.TextSecondary,
                 modifier = Modifier.padding(end = 16.dp)
             )
 
-            // Repost button
             IconButton(
                 onClick = {
                     if (isReposted) {
                         showRepostDialog = true
                     } else {
-                        isReposted = true
                         postViewModel.repostPost(post.id)
+                        isReposted = true
                         haptic.performHapticFeedback(view)
                     }
                 },
                 modifier = Modifier.size(40.dp)
             ) {
-                Icon(
-                    imageVector = if (isReposted) Icons.Filled.Repeat else Icons.Outlined.Repeat,
-                    contentDescription = if (isReposted) "Remove Repost" else "Repost",
+                CustomIcon(
+                    iconType = CustomIconType.REPOST,
                     tint = repostIconColor,
                     modifier = Modifier
                         .size(22.dp)
@@ -394,31 +524,29 @@ fun PostItem(
             Text(
                 text = "${post.reposts}",
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                color = AppColors.TextSecondary,
                 modifier = Modifier.padding(end = 16.dp)
             )
 
-            // Share button
             IconButton(
-                onClick = {
-                    // Implement share functionality
-                },
+                onClick = { /* Implement share functionality */ },
                 modifier = Modifier.size(40.dp)
             ) {
-                Icon(
-                    Icons.Outlined.Share,
-                    contentDescription = "Share",
+                CustomIcon(
+                    iconType = CustomIconType.SHARE,
                     modifier = Modifier.size(22.dp)
                 )
             }
         }
 
-        // Options dialog
         if (showOptionsMenu) {
             AlertDialog(
                 onDismissRequest = { showOptionsMenu = false },
                 confirmButton = {
-                    TextButton(onClick = { postViewModel.deletePost(post.id); showOptionsMenu = false }) {
+                    TextButton(onClick = {
+                        postViewModel.deletePost(post.id)
+                        showOptionsMenu = false
+                    }) {
                         Text("Delete")
                     }
                 },
@@ -430,90 +558,54 @@ fun PostItem(
                 text = { Text("Do you want to delete this post?") }
             )
         }
-    }
 
-    // Repost dialog
-    if (showRepostDialog) {
-        AlertDialog(
-            onDismissRequest = { showRepostDialog = false },
-            icon = {
-                Icon(
-                    Icons.Filled.Repeat,
-                    contentDescription = null,
-                    tint = Color(0xFF4CAF50),
-                    modifier = Modifier.size(32.dp)
-                )
-            },
-            title = { Text("Remove Repost?") },
-            text = { Text("This post will be removed from your profile's reposts.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        isReposted = false
-                        postViewModel.undoRepost(post.id)
-                        showRepostDialog = false
-                        haptic.performHapticFeedback(view)
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF4CAF50)
+        if (showRepostDialog) {
+            AlertDialog(
+                onDismissRequest = { showRepostDialog = false },
+                icon = {
+                    Icon(
+                        Icons.Filled.Repeat,
+                        contentDescription = null,
+                        tint = Color(0xFF4CAF50),
+                        modifier = Modifier.size(32.dp)
                     )
-                ) {
-                    Text("Remove")
+                },
+                title = { Text("Remove Repost?") },
+                text = { Text("This post will be removed from your profile's reposts.") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            postViewModel.undoRepost(post.id)
+                            isReposted = false
+                            showRepostDialog = false
+                            haptic.performHapticFeedback(view)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF4CAF50)
+                        )
+                    ) {
+                        Text("Remove")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showRepostDialog = false }) {
+                        Text("Cancel")
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRepostDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
+            )
+        }
 
-    if (showRepostDialog) {
-        AlertDialog(
-            onDismissRequest = { showRepostDialog = false },
-            icon = {
-                Icon(
-                    Icons.Filled.Repeat,
-                    contentDescription = null,
-                    tint = Color(0xFF4CAF50),
-                    modifier = Modifier.size(32.dp)
-                )
-            },
-            title = { Text("Remove Repost?") },
-            text = { Text("This post will be removed from your profile's reposts.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        isReposted = false
-                        postViewModel.undoRepost(post.id)
-                        showRepostDialog = false
-                        haptic.performHapticFeedback(view)
-                    },
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF4CAF50)
-                    )
-                ) {
-                    Text("Remove")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showRepostDialog = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
-    }
-
-    // Image viewer
-    if (showImageViewer) {
-        FullScreenImageViewer(
-            imageUrls = post.imageUrls,
-            initialPage = initialPage,
-            onDismiss = { showImageViewer = false }
-        )
+        if (showImageViewer) {
+            FullScreenImageViewer(
+                imageUrls = post.imageUrls,
+                initialPage = initialPage,
+                onDismiss = { showImageViewer = false }
+            )
+        }
     }
 }
+
+
 
 //// Haptic feedback function
 //private fun performHapticFeedback(context: Context) {
@@ -528,9 +620,6 @@ fun PostItem(
 
 
 
-
-
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FullScreenImageViewer(
@@ -542,13 +631,18 @@ fun FullScreenImageViewer(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(Color.Black)
         ) {
+            // Horizontal pager for displaying images
             HorizontalPager(
                 state = pagerState
             ) { page ->
@@ -560,6 +654,7 @@ fun FullScreenImageViewer(
                 )
             }
 
+            // Close button at the top right
             IconButton(
                 onClick = onDismiss,
                 modifier = Modifier
@@ -567,12 +662,13 @@ fun FullScreenImageViewer(
                     .padding(16.dp)
             ) {
                 Icon(
-                    Icons.Default.Close,
+                    imageVector = Icons.Default.Close,
                     contentDescription = "Close",
                     tint = Color.White
                 )
             }
 
+            // Page indicator at the bottom center
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)

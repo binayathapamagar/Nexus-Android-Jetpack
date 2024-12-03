@@ -1,6 +1,7 @@
 package com.example.myapplication.screens
 
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -77,9 +78,12 @@ fun SearchScreen(modifier: Modifier = Modifier, navController: NavController, au
             onValueChange = { searchQuery = it },
             placeholder = { Text("Search users...") },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.White, RoundedCornerShape(50)), // Ensure the background color is white
             shape = RoundedCornerShape(50),
             colors = TextFieldDefaults.textFieldColors(
+                containerColor = Color.White, // Explicitly set the background color to white
                 focusedIndicatorColor = Color.Transparent, // Removes the focused underline
                 unfocusedIndicatorColor = Color.Transparent // Removes the unfocused underline
             ),
@@ -92,6 +96,7 @@ fun SearchScreen(modifier: Modifier = Modifier, navController: NavController, au
                 }
             )
         )
+
 
         Spacer(modifier = Modifier.height(16.dp))
 

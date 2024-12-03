@@ -28,10 +28,10 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.myapplication.Post
 import com.example.myapplication.R
-import com.example.myapplication.Reply
 import com.example.myapplication.UserProfileViewModel
-import com.example.myapplication.custom_color.color
+import com.example.myapplication.ui.theme.AppColors
 import com.example.myapplication.utils.toRelativeTimeString
+import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -133,8 +133,8 @@ fun OtherUsers(
                             onClick = { /* Handle follow button */ },
                             modifier = Modifier.fillMaxWidth(),
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = color.Black,
-                                contentColor = color.White
+                                containerColor = AppColors.Primary,
+                                contentColor = AppColors.White
                             ),
                             shape = RoundedCornerShape(8.dp)
                         ) {
@@ -174,7 +174,7 @@ fun OtherUsers(
                         HorizontalDivider(
                             modifier = Modifier.fillMaxWidth(),
                             thickness = 1.dp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                            color = AppColors.Divider
                         )
                     }
                     1 -> ContentList(replies, "No replies available") { reply ->
@@ -182,7 +182,7 @@ fun OtherUsers(
                         HorizontalDivider(
                             modifier = Modifier.fillMaxWidth(),
                             thickness = 1.dp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                            color = AppColors.Divider
                         )
                     }
                     2 -> ContentList(reposts, "No reposts available") { repost ->
@@ -193,7 +193,7 @@ fun OtherUsers(
                         HorizontalDivider(
                             modifier = Modifier.fillMaxWidth(),
                             thickness = 1.dp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                            color = AppColors.Divider
                         )
                     }
                 }
@@ -429,13 +429,22 @@ data class Post(
 
 // Reply model
 data class Reply(
-    val id: String = "", // Unique ID for the reply
-    val postId: String = "", // ID of the post being replied to
-    val content: String = "", // Reply content
-    val userId: String = "", // ID of the user who made the reply
-    val userName: String = "", // Name of the reply creator
-    val timestamp: String = "" // Timestamp of the reply
+    val id: String = "",
+    val userId: String = "",
+    val userName: String = "",
+    val userProfileImageUrl: String = "",
+    val content: String = "",
+    val imageUrls: List<String> = emptyList(), // Added image support
+    val timestamp: java.util.Date? = null,
+    val likes: Int = 0,
+    val replies: Int = 0,
+    val reposts: Int = 0,
+    val isLikedByCurrentUser: Boolean = false,
+    val likedBy: List<String> = emptyList(),
+    val parentReplyId: String? = null, // Added to track parent reply
+    val nestedReplies: List<Reply> = emptyList()
 )
+
 
 // Repost model
 data class Repost(

@@ -27,7 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.myapplication.AuthViewModel
-import com.example.myapplication.custom_color.color
+import com.example.myapplication.components.CustomIcon
+import com.example.myapplication.components.CustomIconType
+import com.example.myapplication.ui.theme.AppColors
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,8 +87,8 @@ fun EditProfile(
                     }
                 },
                 navigationIcon = {
-                    TextButton(onClick = { navController.popBackStack() }) {
-                        Text("Cancel", color = color.Black)
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        CustomIcon(CustomIconType.BACK)
                     }
                 },
                 actions = {
@@ -101,12 +103,13 @@ fun EditProfile(
                             navController.popBackStack()
                         }
                     ) {
-                        Text("Done", color = color.Black)
+                        Text("Done", color = AppColors.Black)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = color.White,
-                    titleContentColor = color.Black
+                    containerColor = AppColors.Surface,
+                    titleContentColor = AppColors.TextPrimary,
+                    navigationIconContentColor = AppColors.TextPrimary
                 )
             )
         }
@@ -187,11 +190,12 @@ fun EditProfile(
                     onValueChange = { nameText = it },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = Color.Gray,
-                        focusedBorderColor = color.Black,
-                        focusedContainerColor = color.White,
-                        unfocusedContainerColor = color.White
-                    ),
+                        unfocusedBorderColor = AppColors.Border,
+                        focusedBorderColor = AppColors.Primary,
+                        focusedContainerColor = AppColors.Surface,
+                        unfocusedContainerColor = AppColors.Surface
+                    )
+                    ,
                     placeholder = { Text("Add your name") }
                 )
             }
@@ -206,11 +210,12 @@ fun EditProfile(
                         .fillMaxWidth()
                         .height(100.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = Color.Gray,
-                        focusedBorderColor = color.Black,
-                        focusedContainerColor = color.White,
-                        unfocusedContainerColor = color.White
-                    ),
+                        unfocusedBorderColor = AppColors.Border,
+                        focusedBorderColor = AppColors.Primary,
+                        focusedContainerColor = AppColors.Surface,
+                        unfocusedContainerColor = AppColors.Surface
+                    )
+                    ,
                     placeholder = { Text("Add a bio") }
                 )
             }
@@ -223,11 +228,12 @@ fun EditProfile(
                     onValueChange = { linkText = it },
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedBorderColor = Color.Gray,
-                        focusedBorderColor = color.Black,
-                        focusedContainerColor = color.White,
-                        unfocusedContainerColor = color.White
-                    ),
+                        unfocusedBorderColor = AppColors.Border,
+                        focusedBorderColor = AppColors.Primary,
+                        focusedContainerColor = AppColors.Surface,
+                        unfocusedContainerColor = AppColors.Surface
+                    )
+                    ,
                     placeholder = { Text("Add link") }
                 )
             }

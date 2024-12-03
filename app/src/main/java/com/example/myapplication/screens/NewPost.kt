@@ -3,6 +3,7 @@ package com.example.myapplication.screens
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -63,7 +64,6 @@ fun NewPost(
                     }
                 },
                 actions = {
-                    // Placeholder to balance the layout
                     IconButton(onClick = {}) {
                         Icon(Icons.Default.Close, contentDescription = null, tint = Color.Transparent)
                     }
@@ -75,6 +75,7 @@ fun NewPost(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .background(Color.White) // Unified background color
         ) {
             Column(
                 modifier = Modifier
@@ -97,7 +98,7 @@ fun NewPost(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Updated TextField with new colors API
+                // TextField with updated colors
                 TextField(
                     value = postText,
                     onValueChange = { postText = it },
@@ -172,6 +173,7 @@ fun NewPost(
         }
     }
 }
+
 
 @Composable
 private fun ActionButton(

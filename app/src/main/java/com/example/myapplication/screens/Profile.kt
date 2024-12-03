@@ -2,7 +2,6 @@ package com.example.myapplication.screens
 
 import android.content.Intent
 import android.net.Uri
-import android.util.Log
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -10,10 +9,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.*
+import androidx.compose.material3.TabRowDefaults.SecondaryIndicator
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,8 +25,10 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.myapplication.AuthViewModel
 import com.example.myapplication.PostViewModel
-import com.example.myapplication.R
-import com.example.myapplication.custom_color.color
+import com.example.myapplication.components.CustomIcon
+import com.example.myapplication.components.CustomIconType
+import com.example.myapplication.ui.theme.AppColors
+
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -67,36 +67,41 @@ fun Profile(
         }
     }
 
-    // Share Bottom Sheet component
-    ShareBottomSheet(
-        isVisible = showShareSheet,
-        onDismiss = { showShareSheet = false },
-        username = userHandle,
-        name = userName,
-        bio = userBio
-    )
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        TopAppBar(
-            title = { },
-            navigationIcon = {
-                IconButton(onClick = { /* Handle language selection */ }) {
-                    Icon(Icons.Default.Language, contentDescription = "Language")
-                }
-            },
-            actions = {
-                IconButton(onClick = { navController.navigate("settings") }) {
-                    Icon(Icons.Default.Menu, contentDescription = "Settings")
-                }
-            },
-            colors = TopAppBarDefaults.topAppBarColors(
-                containerColor = color.White,
-                navigationIconContentColor = color.Black,
-                actionIconContentColor = color.Black
+    Scaffold(
+        containerColor = AppColors.Surface,
+        topBar = {
+            TopAppBar(
+                title = { },
+                navigationIcon = {
+                    IconButton(onClick = { /* Handle language selection */ }) {
+                        CustomIcon(
+                            iconType = CustomIconType.LANGUAGE,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { navController.navigate("settings") }) {
+                        CustomIcon(
+                            iconType = CustomIconType.MENU,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = AppColors.Surface,
+                    navigationIconContentColor = AppColors.TextPrimary,
+                    actionIconContentColor = AppColors.TextPrimary
+                )
             )
-        )
-
-        Box(modifier = Modifier.fillMaxSize()) {
+        }
+    ) { paddingValues ->
+        Surface(
+            color = AppColors.Surface,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+        ) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize()
@@ -116,11 +121,14 @@ fun Profile(
                             Column {
                                 Text(
                                     text = userName ?: "User Name",
-                                    style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = AppColors.TextPrimary
                                 )
                                 Text(
                                     text = userHandle ?: "user_handle",
-                                    style = MaterialTheme.typography.bodyMedium
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = AppColors.TextSecondary
                                 )
                             }
                             AsyncImage(
@@ -137,19 +145,18 @@ fun Profile(
 
                         Text(
                             text = userBio ?: "User bio goes here",
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = AppColors.TextPrimary
                         )
 
-                        // Add profile link display after bio
                         if (!profileLink.isNullOrEmpty()) {
                             Spacer(modifier = Modifier.height(8.dp))
                             val context = LocalContext.current
                             Text(
                                 text = profileLink!!,
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = MaterialTheme.colorScheme.primary,
-                                    textDecoration = TextDecoration.Underline
-                                ),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = AppColors.Primary,
+                                textDecoration = TextDecoration.Underline,
                                 modifier = Modifier.clickable {
                                     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(profileLink))
                                     context.startActivity(intent)
@@ -160,15 +167,10 @@ fun Profile(
                         Spacer(modifier = Modifier.height(16.dp))
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            AsyncImage(
-                                model = R.drawable.followers,
-                                contentDescription = "Followers",
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = "${followerCount ?: 0} followers",
-                                style = MaterialTheme.typography.bodyMedium
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = AppColors.TextPrimary
                             )
                         }
 
@@ -178,33 +180,21 @@ fun Profile(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Button(
-                                onClick = {
-                                    try {
-                                        navController.navigate("edit_profile")
-                                    } catch (e: Exception) {
-                                        Log.e("Navigation", "Error navigating to edit profile: ${e.message}")
-                                    }
-                                },
+                            OutlinedButton(
+                                onClick = { navController.navigate("edit_profile") },
                                 modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = color.White,
-                                    contentColor = color.Black
-                                ),
+                                border = BorderStroke(1.dp, AppColors.Border),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text("Edit profile")
+                                Text("Edit profile", color = AppColors.TextPrimary)
                             }
-                            Button(
+                            OutlinedButton(
                                 onClick = { showShareSheet = true },
                                 modifier = Modifier.weight(1f),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = color.White,
-                                    contentColor = color.Black
-                                ),
+                                border = BorderStroke(1.dp, AppColors.Border),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
-                                Text("Share profile")
+                                Text("Share profile", color = AppColors.TextPrimary)
                             }
                         }
 
@@ -212,111 +202,94 @@ fun Profile(
                     }
                 }
 
-                // Sticky Header
+                // Sticky Header with Tabs
                 stickyHeader {
                     Surface(
-                        color = color.White,
-                        modifier = Modifier.fillMaxWidth(),
+                        color = AppColors.Surface,
                         shadowElevation = if (isScrolled) 1.dp else 0.dp
                     ) {
                         TabRow(
                             selectedTabIndex = selectedTab,
-                            containerColor = color.White,
-                            contentColor = color.Black,
-                            divider = {
-                                HorizontalDivider(
-                                    thickness = 1.dp,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                            containerColor = AppColors.Surface,
+                            contentColor = AppColors.TextPrimary,
+                            indicator = { tabPositions ->
+                                SecondaryIndicator(
+                                    modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
+                                    color = AppColors.Primary
                                 )
+                            },
+                            divider = {
+                                HorizontalDivider(color = AppColors.Divider)
                             }
                         ) {
-                            Tab(
-                                selected = selectedTab == 0,
-                                onClick = { selectedTab = 0 }
-                            ) {
-                                Text(
-                                    "Threads",
-                                    modifier = Modifier.padding(vertical = 12.dp),
-                                    fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
-                            Tab(
-                                selected = selectedTab == 1,
-                                onClick = { selectedTab = 1 }
-                            ) {
-                                Text(
-                                    "Replies",
-                                    modifier = Modifier.padding(vertical = 12.dp),
-                                    fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal
-                                )
-                            }
-                            Tab(
-                                selected = selectedTab == 2,
-                                onClick = { selectedTab = 2 }
-                            ) {
-                                Text(
-                                    "Reposts",
-                                    modifier = Modifier.padding(vertical = 12.dp),
-                                    fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal
-                                )
+                            listOf("Threads", "Replies", "Reposts").forEachIndexed { index, title ->
+                                Tab(
+                                    selected = selectedTab == index,
+                                    onClick = { selectedTab = index },
+                                    modifier = Modifier.background(AppColors.Surface)
+                                ) {
+                                    Text(
+                                        text = title,
+                                        fontWeight = if (selectedTab == index)
+                                            FontWeight.Bold else FontWeight.Normal,
+                                        modifier = Modifier.padding(vertical = 12.dp),
+                                        color = if (selectedTab == index)
+                                            AppColors.TextPrimary
+                                        else
+                                            AppColors.TextSecondary
+                                    )
+                                }
                             }
                         }
                     }
                 }
 
-                // Posts
+                // Content based on selected tab
                 when (selectedTab) {
-                    0 -> {
-                        items(userPosts) { post ->
-                            PostItem(
-                                post = post,
-                                postViewModel = postViewModel,
-                                navController = parentNavController,
-                                modifier = Modifier.padding(horizontal = 8.dp)
-                            )
-                            HorizontalDivider(
-                                modifier = Modifier.fillMaxWidth(),
-                                thickness = 1.dp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                            )
-                        }
+                    0 -> items(userPosts) { post ->
+                        PostItem(
+                            post = post,
+                            postViewModel = postViewModel,
+                            navController = parentNavController,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                        HorizontalDivider(color = AppColors.Divider)
                     }
-                    1 -> {
-                        items(userReplies) { (post, reply) ->
-                            UserReplyItem(
-                                post = post,
-                                reply = reply,
-                                postViewModel = postViewModel,
-                                navController = parentNavController,
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            )
-                            HorizontalDivider(
-                                modifier = Modifier.fillMaxWidth(),
-                                thickness = 1.dp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                            )
-                        }
+                    1 -> items(userReplies) { (post, reply) ->
+                        UserReplyItem(
+                            post = post,
+                            reply = reply,
+                            postViewModel = postViewModel,
+                            navController = parentNavController,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                        HorizontalDivider(color = AppColors.Divider)
                     }
-                    2 -> {
-                        items(userReposts) { post ->
-                            if (post.isRepost) {
-                                RepostHeader(repostedByName = post.repostedByName ?: "")
-                            }
-                            PostItem(
-                                post = post,
-                                postViewModel = postViewModel,
-                                navController = parentNavController,
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            )
-                            HorizontalDivider(
-                                modifier = Modifier.fillMaxWidth(),
-                                thickness = 1.dp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-                            )
+                    2 -> items(userReposts) { post ->
+                        if (post.isRepost) {
+                            RepostHeader(repostedByName = post.repostedByName ?: "")
                         }
+                        PostItem(
+                            post = post,
+                            postViewModel = postViewModel,
+                            navController = parentNavController,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                        HorizontalDivider(color = AppColors.Divider)
                     }
                 }
             }
         }
     }
+
+    if (showShareSheet) {
+        ShareBottomSheet(
+            isVisible = true,
+            onDismiss = { showShareSheet = false },
+            username = userHandle,
+            name = userName,
+            bio = userBio
+        )
+    }
 }
+

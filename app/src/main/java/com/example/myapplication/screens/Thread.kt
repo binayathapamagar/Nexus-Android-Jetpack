@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.myapplication.PostViewModel
 import com.example.myapplication.PostWithReplies
@@ -32,7 +33,9 @@ fun Thread(
             TopAppBar(
                 title = {
                     Box(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(end = 48.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(

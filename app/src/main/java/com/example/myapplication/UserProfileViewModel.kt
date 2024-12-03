@@ -8,9 +8,11 @@ import com.google.firebase.storage.StorageReference
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
-import com.example.myapplication.screens.Reply
-import com.example.myapplication.screens.Repost
-import com.example.myapplication.screens.UserProfile
+import com.example.myapplication.models.Post
+import com.example.myapplication.models.Reply
+import com.example.myapplication.models.Repost
+import com.example.myapplication.models.UserProfile
+
 import com.google.firebase.firestore.FirebaseFirestore
 
 class UserProfileViewModel : ViewModel() {

@@ -23,11 +23,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
-import com.example.myapplication.Post
 import com.example.myapplication.PostViewModel
 import com.example.myapplication.R
 import com.example.myapplication.components.CustomIcon
 import com.example.myapplication.components.CustomIconType
+import com.example.myapplication.models.Post
+import com.example.myapplication.models.Reply
 import com.example.myapplication.navigation.Routes
 import com.example.myapplication.utils.toRelativeTimeString
 

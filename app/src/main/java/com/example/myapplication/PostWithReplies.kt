@@ -7,14 +7,12 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -27,10 +25,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.example.myapplication.models.Post
+import com.example.myapplication.models.Reply
 import com.example.myapplication.navigation.Routes
 import com.example.myapplication.screens.FullScreenImageViewer
 import com.example.myapplication.screens.PostItem
-import com.example.myapplication.screens.Reply
 import com.example.myapplication.utils.toRelativeTimeString
 
 @Composable
@@ -91,41 +90,54 @@ fun ReplyItem(
     postId: String,
     navController: NavController,
     modifier: Modifier = Modifier,
-    isNested: Boolean = false // Add parameter to track nested status
+    depth: Int = 0,
+    maxDepth: Int = 5
 ) {
     var showOptionsMenu by remember { mutableStateOf(false) }
     var isLiked by remember { mutableStateOf(reply.isLikedByCurrentUser) }
+    var likeCount by remember { mutableIntStateOf(reply.likes) }
+    var replyCount by remember { mutableIntStateOf(reply.replies) }
+    var repostCount by remember { mutableIntStateOf(reply.reposts) }
     var showNestedReplies by remember { mutableStateOf(false) }
     var showImageViewer by remember { mutableStateOf(false) }
     var initialPage by remember { mutableIntStateOf(0) }
 
-    // Direct replies filtering
-    val directReplies = reply.nestedReplies.filter { it.parentReplyId == reply.id }
+    LaunchedEffect(reply) {
+        isLiked = reply.isLikedByCurrentUser
+        likeCount = reply.likes
+        replyCount = reply.replies
+        repostCount = reply.reposts
+    }
 
     Column(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 12.dp)
     ) {
-        // Main content (profile picture, text, interactions)
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.Top
         ) {
+            // Indentation for nested replies
+            if (depth > 0) {
+                Spacer(modifier = Modifier.width((depth * 16).dp))
+            }
+
             AsyncImage(
                 model = reply.userProfileImageUrl,
                 contentDescription = "Profile Picture",
                 modifier = Modifier
-                    .size(40.dp)
+                    .size(32.dp)
                     .clip(CircleShape)
                     .clickable { navController.navigate("otherUsers/${reply.userId}") },
                 contentScale = ContentScale.Crop,
                 error = painterResource(id = R.drawable.person)
             )
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
             Column(modifier = Modifier.weight(1f)) {
+                // Username and timestamp
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -134,6 +146,7 @@ fun ReplyItem(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
                             text = reply.userName,
+                            style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.clickable {
                                 navController.navigate("otherUsers/${reply.userId}")
@@ -149,27 +162,34 @@ fun ReplyItem(
 
                     IconButton(
                         onClick = { showOptionsMenu = true },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(24.dp)
                     ) {
                         Icon(
                             painter = painterResource(id = R.drawable.more),
                             contentDescription = "More options",
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
 
-                Text(reply.content)
+                // Reply content
+                Text(
+                    text = reply.content,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.padding(vertical = 4.dp)
+                )
 
+                // Images section
                 if (reply.imageUrls.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    LazyRow {
+                    LazyRow(
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    ) {
                         items(reply.imageUrls) { imageUrl ->
                             AsyncImage(
                                 model = imageUrl,
                                 contentDescription = "Reply Image",
                                 modifier = Modifier
-                                    .size(150.dp)
+                                    .size(120.dp)
                                     .padding(end = 8.dp)
                                     .clip(RoundedCornerShape(8.dp))
                                     .clickable {
@@ -182,182 +202,120 @@ fun ReplyItem(
                     }
                 }
 
-                InteractionButtons(
-                    reply = reply,
-                    postId = postId,
-                    postViewModel = postViewModel,
-                    navController = navController
-                )
-            }
-        }
-
-        // Nested replies section
-        if (directReplies.isNotEmpty()) {
-            Column(modifier = Modifier.padding(top = 8.dp)) {
+                // Interaction buttons
                 Row(
-                    modifier = Modifier
-                        .clickable { showNestedReplies = !showNestedReplies }
-                        .padding(vertical = 4.dp),
+                    modifier = Modifier.padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = if (showNestedReplies) "Hide replies" else "Show replies",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = " (${directReplies.size})",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
+                    // Like button
+                    IconButton(
+                        onClick = {
+                            isLiked = !isLiked
+                            likeCount = if (isLiked) likeCount + 1 else likeCount - 1
+                            postViewModel.likeReply(postId, reply.id, isLiked)
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(if (isLiked) R.drawable.hearted else R.drawable.heart),
+                            contentDescription = "Like",
+                            tint = if (isLiked) Color.Red else LocalContentColor.current,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Text("$likeCount", style = MaterialTheme.typography.bodySmall)
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    // Reply button - Navigates to Reply screen
+                    if (depth < maxDepth) {
+                        IconButton(
+                            onClick = {
+                                navController.navigate(
+                                    Routes.createReplyRoute(
+                                        postId = postId,
+                                        parentReplyId = reply.id,
+                                        replyToUsername = reply.userName
+                                    )
+                                )
+                            },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.messagetext1),
+                                contentDescription = "Reply",
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        Text("$replyCount", style = MaterialTheme.typography.bodySmall)
+                    }
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    // Repost button
+                    IconButton(
+                        onClick = { postViewModel.repostReply(postId, reply.id) },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.repeat),
+                            contentDescription = "Repost",
+                            tint = if (repostCount > 0) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Text("$repostCount", style = MaterialTheme.typography.bodySmall)
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    // Share button
+                    IconButton(
+                        onClick = { /* Implement share functionality */ },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.send2),
+                            contentDescription = "Share",
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
                 }
 
-                AnimatedVisibility(
-                    visible = showNestedReplies,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
-                ) {
-                    Column(modifier = Modifier.padding(start = 16.dp, top = 8.dp)) {
-                        directReplies.forEach { nestedReply ->
-                            ReplyItem(
-                                reply = nestedReply,
-                                postViewModel = postViewModel,
-                                postId = postId,
-                                navController = navController,
-                                isNested = true
-                            )
+                // Nested replies toggle
+                if (reply.nestedReplies.isNotEmpty()) {
+                    TextButton(
+                        onClick = { showNestedReplies = !showNestedReplies },
+                        modifier = Modifier.padding(vertical = 4.dp)
+                    ) {
+                        Text(
+                            if (showNestedReplies) "Hide replies" else "Show replies (${reply.nestedReplies.size})",
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    AnimatedVisibility(
+                        visible = showNestedReplies,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column {
+                            reply.nestedReplies.forEach { nestedReply ->
+                                ReplyItem(
+                                    reply = nestedReply,
+                                    postViewModel = postViewModel,
+                                    postId = postId,
+                                    navController = navController,
+                                    depth = depth + 1,
+                                    maxDepth = maxDepth
+                                )
+                            }
                         }
                     }
                 }
             }
         }
-
-        // Only show divider if not a nested reply or if it has nested replies that aren't shown
-        if (!isNested || (directReplies.isNotEmpty() && !showNestedReplies)) {
-            HorizontalDivider(
-                modifier = Modifier.fillMaxWidth(),
-                thickness = 0.5.dp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-            )
-        }
-    }
-
-    // Dialogs for image viewer and options menu
-    if (showImageViewer) {
-        FullScreenImageViewer(
-            imageUrls = reply.imageUrls,
-            initialPage = initialPage,
-            onDismiss = { showImageViewer = false }
-        )
-    }
-
-    if (showOptionsMenu) {
-        AlertDialog(
-            onDismissRequest = { showOptionsMenu = false },
-            title = { Text("Delete Reply?") },
-            text = { Text("Are you sure you want to delete this reply? This action cannot be undone.") },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        postViewModel.deleteReply(postId, reply.id)
-                        showOptionsMenu = false
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
-                ) {
-                    Text("Delete", color = Color.White)
-                }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { showOptionsMenu = false }) {
-                    Text("Cancel")
-                }
-            }
-        )
     }
 }
 
 
-
-@Composable
-private fun InteractionButtons(
-    reply: Reply,
-    postId: String,
-    postViewModel: PostViewModel,
-    navController: NavController
-) {
-    Row(
-        modifier = Modifier.padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        InteractionButton(
-            iconRes = R.drawable.heart,
-            count = reply.likes,
-            isActive = reply.isLikedByCurrentUser,
-            activeColor = Color.Red,
-            onClick = {
-                postViewModel.likeReply(postId, reply.id, !reply.isLikedByCurrentUser)
-            }
-        )
-
-        InteractionButton(
-            iconRes = R.drawable.messagetext1,
-            count = reply.replies,
-            isActive = false,
-            onClick = {
-                navController.navigate(Routes.createReplyRoute(postId, reply.userName))
-            }
-        )
-
-        InteractionButton(
-            iconRes = R.drawable.repeat,
-            count = reply.reposts,
-            isActive = false,
-            activeColor = Color.Green,
-            onClick = { postViewModel.repostReply(postId, reply.id) }
-        )
-
-        IconButton(
-            onClick = { /* Implement share */ },
-            modifier = Modifier.size(40.dp)
-        ) {
-            Icon(
-                painter = painterResource(id = R.drawable.send2),
-                contentDescription = "Share",
-                modifier = Modifier.size(20.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun InteractionButton(
-    iconRes: Int,
-    count: Int,
-    isActive: Boolean,
-    activeColor: Color = MaterialTheme.colorScheme.primary,
-    onClick: () -> Unit
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.clickable(
-            onClick = onClick,
-            indication = rememberRipple(bounded = false),
-            interactionSource = remember { MutableInteractionSource() }
-        )
-    ) {
-        Icon(
-            painter = painterResource(id = iconRes),
-            contentDescription = null,
-            tint = if (isActive) activeColor else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-            modifier = Modifier.size(20.dp)
-        )
-        Spacer(modifier = Modifier.width(4.dp))
-        Text(
-            text = count.toString(),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-        )
-        Spacer(modifier = Modifier.width(16.dp))
-    }
-}
 

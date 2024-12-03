@@ -8,12 +8,22 @@ object Routes {
     const val SEARCH = "search"
     const val SETTINGS = "settings"
     const val NEW_POST = "new_post"
-    const val REPLY = "reply/{postId}/{username}/{parentReplyId}"
+    const val REPLY = "reply/{postId}/{replyToUsername}?parentReplyId={parentReplyId}"
     const val POST_REPLIES = "post_replies/{postId}"
     const val THREAD = "thread/{postId}"
 
-    fun createReplyRoute(postId: String, username: String, parentReplyId: String? = null) =
-        "reply/$postId/$username/${parentReplyId ?: "null"}"
+    fun createReplyRoute(
+        postId: String,
+        replyToUsername: String,
+        parentReplyId: String? = null
+    ): String {
+        return if (parentReplyId != null) {
+            "reply/$postId/$replyToUsername?parentReplyId=$parentReplyId"
+        } else {
+            "reply/$postId/$replyToUsername"
+        }
+    }
 
     fun createThreadRoute(postId: String) = "thread/$postId"
 }
+

@@ -21,7 +21,7 @@ import com.example.myapplication.ui.theme.AppColors
 
 @Composable
 fun MainContainer(
-    parentNavController: NavController,
+    parentNavController: NavController,  // Pass this down
     authViewModel: AuthViewModel,
     parentPostViewModel: PostViewModel
 ) {
@@ -160,7 +160,8 @@ fun MainContainer(
                     val userId = backStackEntry.arguments?.getString("userId") ?: ""
                     OtherUsers(
                         navController = navController,
-                        userId = userId,
+                        parentNavController = parentNavController,  // Pass parent controller
+                        userId = userId
                     )
                 }
             }

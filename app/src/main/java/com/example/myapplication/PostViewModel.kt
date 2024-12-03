@@ -5,15 +5,20 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.myapplication.models.NotificationType
-import com.example.myapplication.screens.Reply
+import com.example.myapplication.models.Post
+import com.example.myapplication.models.Reply
+import com.example.myapplication.models.RepostStatus
+import com.google.android.gms.tasks.Task
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.QuerySnapshot
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -22,37 +27,7 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.util.*
 
-data class Post(
-    val id: String = "",
-    val userId: String = "",
-    val userName: String = "",
-    val userProfileImageUrl: String = "",
-    val content: String = "",
-    val imageUrls: List<String> = emptyList(),
-    val timestamp: Date? = null,
-    val likes: Int = 0,
-    val comments: Int = 0,
-    val reposts: Int = 0,val isLikedByCurrentUser: Boolean = false,
-    val likedBy: List<String> = emptyList(),
-    // New repost-related fields
-    val isRepost: Boolean = false,
-    val originalPostId: String? = null,
-    val repostedBy: String? = null,
-    val repostedByName: String? = null,
-    val repostTimestamp: Date? = null,
-    val isRepostedByCurrentUser: Boolean = false,
-    val repostStatus: RepostStatus = RepostStatus()
-)
 
-
-
-data class RepostStatus(
-    val isReposted: Boolean = false,
-    val repostedBy: String? = null,
-    val repostedByName: String? = null,
-    val repostTimestamp: Date? = null,
-    val repostId: String? = null
-)
 
 class PostViewModel : ViewModel() {
     private val firestore = FirebaseFirestore.getInstance()
@@ -362,6 +337,8 @@ class PostViewModel : ViewModel() {
         }
     }
 
+    // In PostViewModel:
+
     fun addReply(
         postId: String,
         replyContent: String,
@@ -380,16 +357,27 @@ class PostViewModel : ViewModel() {
                     ?: currentUser.displayName
                     ?: "User"
                 val userProfileImageUrl = userSnapshot.child("profileImageUrl").getValue(String::class.java)
-                    ?: currentUser.photoUrl?.toString()
                     ?: ""
 
                 // Upload images if any
                 val imageUrls = uploadImages(imageUris)
 
-                val replyRef = firestore.collection("posts")
-                    .document(postId)
-                    .collection("comments")
-                    .document()
+                // Create the reply document
+                val replyRef = if (parentReplyId != null) {
+                    // For nested replies, store under the parent reply
+                    firestore.collection("posts")
+                        .document(postId)
+                        .collection("comments")
+                        .document(parentReplyId)
+                        .collection("replies")
+                        .document()
+                } else {
+                    // For top-level replies
+                    firestore.collection("posts")
+                        .document(postId)
+                        .collection("comments")
+                        .document()
+                }
 
                 val reply = hashMapOf(
                     "id" to replyRef.id,
@@ -402,43 +390,39 @@ class PostViewModel : ViewModel() {
                     "likes" to 0,
                     "likedBy" to listOf<String>(),
                     "parentReplyId" to parentReplyId,
-                    "replies" to 0,  // Add this field for nested replies count
-                    "reposts" to 0   // Add this field for reposts count
+                    "replies" to 0
                 )
 
-                // Use a transaction to ensure atomicity
                 firestore.runTransaction { transaction ->
                     // Add the reply
                     transaction.set(replyRef, reply)
 
-                    // Update comments count
-                    val postRef = firestore.collection("posts").document(postId)
-                    transaction.update(postRef, "comments", FieldValue.increment(1))
-
-                    // If this is a nested reply, update the parent reply's nested replies count
+                    // Update reply count on parent
                     if (parentReplyId != null) {
                         val parentReplyRef = firestore.collection("posts")
                             .document(postId)
                             .collection("comments")
                             .document(parentReplyId)
-                        transaction.update(parentReplyRef, "replies", FieldValue.increment(1))
+
+                        val parentSnapshot = transaction.get(parentReplyRef)
+                        val currentReplies = parentSnapshot.getLong("replies") ?: 0
+                        transaction.update(parentReplyRef, "replies", currentReplies + 1)
                     }
+
+                    // Update comment count on post
+                    val postRef = firestore.collection("posts").document(postId)
+                    transaction.update(postRef, "comments", FieldValue.increment(1))
                 }.await()
 
-                // Create notification with proper type
-                if (parentReplyId != null) {
-                    createNotification(postId, NotificationType.REPLY)
-                } else {
-                    createNotification(postId, NotificationType.COMMENT)
-                }
+                // Create notification
+                createNotification(
+                    postId = postId,
+                    type = NotificationType.COMMENT,
+                    mentionedUserIds = emptyList()
+                )
 
-                // Update local state
-                if (parentReplyId != null) {
-                    _replies.value = buildNestedReplies(_replies.value)
-                } else {
-                    fetchReplies(postId)
-                }
-
+                // Refresh data
+                fetchReplies(postId)
             } catch (e: Exception) {
                 Log.e("PostViewModel", "Error adding reply: ${e.message}", e)
                 throw e
@@ -446,58 +430,230 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    // Helper function to build nested reply structure
-    private fun buildNestedReplies(replies: List<Reply>): List<Reply> {
-        val replyMap = replies.associateBy { it.id }.toMutableMap()
-        val rootReplies = mutableListOf<Reply>()
+    // New helper function to fetch and build nested replies
+    private suspend fun fetchAndBuildNestedReplies(postId: String): List<Reply> {
+        val repliesSnapshot = firestore.collection("posts")
+            .document(postId)
+            .collection("comments")
+            .orderBy("timestamp", Query.Direction.ASCENDING)
+            .get()
+            .await()
 
-        replies.forEach { reply ->
-            if (reply.parentReplyId != null) {
-                val parentReply = replyMap[reply.parentReplyId]
-                if (parentReply != null) {
-                    replyMap[reply.parentReplyId] = parentReply.copy(
-                        nestedReplies = parentReply.nestedReplies + reply
-                    )
+        val currentUser = auth.currentUser
+        val allReplies = mutableListOf<Reply>()
+
+        for (doc in repliesSnapshot.documents) {
+            try {
+                // Parse main reply
+                val reply = parseReplyDocument(doc, currentUser?.uid)
+
+                // Fetch nested replies from the 'replies' subcollection
+                val nestedRepliesSnapshot = fetchNestedRepliesForComment(postId, doc.id).await()
+
+                // Parse nested replies
+                val nestedReplies = nestedRepliesSnapshot.documents.mapNotNull { nestedDoc ->
+                    try {
+                        parseReplyDocument(nestedDoc, currentUser?.uid)
+                    } catch (e: Exception) {
+                        Log.e("PostViewModel", "Error parsing nested reply: ${e.message}", e)
+                        null
+                    }
                 }
-            } else {
-                rootReplies.add(reply)
+
+                // Add reply with its nested replies
+                allReplies.add(reply.copy(nestedReplies = nestedReplies))
+            } catch (e: Exception) {
+                Log.e("PostViewModel", "Error parsing reply: ${e.message}", e)
             }
         }
 
-        return rootReplies.map { replyMap[it.id] ?: it }
+        return buildNestedReplies(allReplies)
     }
 
 
-    private suspend fun extractMentionedUsers(content: String): List<String> =
-        withContext(Dispatchers.IO) {
-            try {
-                val mentions = Regex("@([\\w.]+)").findAll(content)
-                val userIds = mutableListOf<String>()
+    // Helper function to build nested reply structure
 
-                mentions.forEach { matchResult ->
-                    val username = matchResult.groupValues[1]
-                    try {
-                        val userQuerySnapshot = firestore.collection("users")
-                            .whereEqualTo("username", username)
-                            .get()
-                            .await()
-                        userQuerySnapshot.documents.firstOrNull()?.id?.let {
-                            userIds.add(it)
-                        }
-                    } catch (e: Exception) {
-                        Log.e(
-                            "PostViewModel",
-                            "Error finding user with username $username: ${e.message}"
-                        )
-                    }
-                }
-                userIds
-            } catch (e: Exception) {
-                Log.e("PostViewModel", "Error in extractMentionedUsers: ${e.message}")
-                emptyList()
-            }
+    private fun buildNestedReplies(replies: List<Reply>): List<Reply> {
+        // Create a map of parent ID to child replies
+        val replyChildrenMap = replies.groupBy { it.parentReplyId }
+
+        // Get top-level replies (no parent)
+        val rootReplies = replyChildrenMap[null] ?: emptyList()
+
+        // Function to recursively build the reply tree
+        fun buildReplyTree(reply: Reply): Reply {
+            val childReplies = replyChildrenMap[reply.id] ?: emptyList()
+            val nestedReplies = childReplies.map { buildReplyTree(it) }
+            return reply.copy(
+                nestedReplies = nestedReplies,
+                replies = childReplies.size + nestedReplies.sumOf { it.replies }
+            )
         }
 
+        return rootReplies.map { buildReplyTree(it) }
+    }
+
+
+    fun addNestedReply(
+        postId: String,
+        parentReplyId: String,
+        content: String,
+        imageUris: List<Uri> = emptyList()
+    ) {
+        viewModelScope.launch {
+            try {
+                val currentUser = auth.currentUser ?: return@launch
+
+                // First get all necessary data before starting transaction
+                val userSnapshot = database.getReference("users")
+                    .child(currentUser.uid)
+                    .get()
+                    .await()
+
+                val userName = userSnapshot.child("fullName").getValue(String::class.java)
+                    ?: currentUser.displayName
+                    ?: "User"
+                val userProfileImageUrl = userSnapshot.child("profileImageUrl").getValue(String::class.java)
+                    ?: ""
+
+                // Upload images
+                val imageUrls = uploadImages(imageUris)
+
+                // Get parent reply reference
+                val parentReplyRef = firestore.collection("posts")
+                    .document(postId)
+                    .collection("comments")
+                    .document(parentReplyId)
+
+                val replyRef = parentReplyRef.collection("replies").document()
+
+                // Create reply data
+                val reply = hashMapOf(
+                    "id" to replyRef.id,
+                    "userId" to currentUser.uid,
+                    "userName" to userName,
+                    "userProfileImageUrl" to userProfileImageUrl,
+                    "content" to content,
+                    "imageUrls" to imageUrls,
+                    "timestamp" to FieldValue.serverTimestamp(),
+                    "likes" to 0,
+                    "likedBy" to listOf<String>(),
+                    "parentReplyId" to parentReplyId,
+                    "replies" to 0
+                )
+
+                // Perform all reads first
+                val parentReplySnapshot = parentReplyRef.get().await()
+                val currentReplies = parentReplySnapshot.getLong("replies") ?: 0
+                val postRef = firestore.collection("posts").document(postId)
+
+                // Then perform all writes in a transaction
+                firestore.runTransaction { transaction ->
+                    // Add the reply
+                    transaction.set(replyRef, reply)
+
+                    // Update parent reply count
+                    transaction.update(parentReplyRef, "replies", currentReplies + 1)
+
+                    // Update post comments count
+                    transaction.update(postRef, "comments", FieldValue.increment(1))
+                }.await()
+
+                // Create notification for parent reply owner
+                val parentReplyUserId = parentReplySnapshot.getString("userId")
+                if (parentReplyUserId != null && parentReplyUserId != currentUser.uid) {
+                    createNotification(postId, NotificationType.COMMENT, listOf(parentReplyUserId))
+                }
+
+                // Create Reply object for immediate state update
+                val newReply = Reply(
+                    id = replyRef.id,
+                    userId = currentUser.uid,
+                    userName = userName,
+                    userProfileImageUrl = userProfileImageUrl,
+                    content = content,
+                    imageUrls = imageUrls,
+                    timestamp = Date(),
+                    parentReplyId = parentReplyId,
+                    nestedReplies = emptyList()
+                )
+
+                // Update local state immediately
+                _replies.value = _replies.value.map { existingReply ->
+                    if (existingReply.id == parentReplyId) {
+                        existingReply.copy(
+                            replies = existingReply.replies + 1,
+                            nestedReplies = existingReply.nestedReplies + newReply
+                        )
+                    } else existingReply
+                }
+
+                // Wait briefly to ensure Firestore has propagated the changes
+                delay(300)
+
+                // Refresh the entire replies tree to ensure consistency
+                fetchReplies(postId)
+
+            } catch (e: Exception) {
+                Log.e("PostViewModel", "Error adding nested reply: ${e.message}", e)
+                throw e
+            }
+        }
+    }
+
+
+    private fun fetchNestedRepliesForComment(
+        postId: String,
+        commentId: String
+    ): Task<QuerySnapshot> {
+        return firestore.collection("posts")
+            .document(postId)
+            .collection("comments")
+            .document(commentId)
+            .collection("replies")
+            .orderBy("timestamp", Query.Direction.ASCENDING)
+            .get()
+    }
+
+    private fun updateNestedRepliesInState(postId: String, parentReplyId: String, newReply: Reply) {
+        _replies.value = _replies.value.map { reply ->
+            if (reply.id == parentReplyId) {
+                // Directly update the parent reply
+                reply.copy(
+                    replies = reply.replies + 1,
+                    nestedReplies = reply.nestedReplies + newReply
+                )
+            } else {
+                // Recursively update nested replies
+                reply.copy(
+                    nestedReplies = updateNestedRepliesRecursively(reply.nestedReplies, parentReplyId, newReply)
+                )
+            }
+        }
+    }
+
+    private fun updateNestedRepliesRecursively(
+        replies: List<Reply>,
+        parentReplyId: String,
+        newReply: Reply
+    ): List<Reply> {
+        return replies.map { reply ->
+            if (reply.id == parentReplyId) {
+                reply.copy(
+                    replies = reply.replies + 1,
+                    nestedReplies = reply.nestedReplies + newReply
+                )
+            } else {
+                reply.copy(
+                    nestedReplies = updateNestedRepliesRecursively(
+                        reply.nestedReplies,
+                        parentReplyId,
+                        newReply
+                    )
+                )
+            }
+        }
+    }
 
     fun getPost(postId: String): StateFlow<Post?> {
         val postFlow = MutableStateFlow<Post?>(null)
@@ -567,37 +723,14 @@ class PostViewModel : ViewModel() {
             }
         }
     }
-    private suspend fun createReplyFromDocument(doc: DocumentSnapshot): Reply {
-        val userId = doc.getString("userId") ?: throw IllegalStateException("No userId found")
-        val content = doc.getString("content") ?: ""
-        val timestamp = doc.getTimestamp("timestamp")?.toDate()
-        val likedBy = (doc.get("likedBy") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
-
-        val userSnapshot = database.getReference("users")
-            .child(userId)
-            .get()
-            .await()
-
-        val userName = userSnapshot.child("fullName").getValue(String::class.java) ?: "Unknown User"
-        val userProfileImageUrl = userSnapshot.child("profileImageUrl").getValue(String::class.java) ?: ""
-
-        return Reply(
-            id = doc.id,
-            userId = userId,
-            userName = userName,
-            userProfileImageUrl = userProfileImageUrl,
-            content = content,
-            timestamp = timestamp,
-            likes = likedBy.size,
-            isLikedByCurrentUser = auth.currentUser?.uid?.let { uid -> likedBy.contains(uid) } ?: false,
-            likedBy = likedBy,
-            nestedReplies = emptyList()
-        )
-    }
 
     fun fetchReplies(postId: String) {
         viewModelScope.launch {
             try {
+                val topLevelReplies = mutableListOf<Reply>()
+                val currentUser = auth.currentUser
+
+                // Fetch top-level replies
                 val repliesSnapshot = firestore.collection("posts")
                     .document(postId)
                     .collection("comments")
@@ -605,41 +738,43 @@ class PostViewModel : ViewModel() {
                     .get()
                     .await()
 
-                val currentUser = auth.currentUser
-                val allReplies = repliesSnapshot.documents.mapNotNull { doc ->
+                for (doc in repliesSnapshot.documents) {
                     try {
-                        val userId = doc.getString("userId") ?: return@mapNotNull null
-                        val content = doc.getString("content") ?: ""
-                        val timestamp = doc.getTimestamp("timestamp")?.toDate()
-                        val likedBy = (doc.get("likedBy") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
-                        val imageUrls = (doc.get("imageUrls") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
-                        val parentReplyId = doc.getString("parentReplyId")
+                        // Parse main reply
+                        val reply = parseReplyDocument(doc, currentUser?.uid)
 
-                        Reply(
-                            id = doc.id,
-                            userId = userId,
-                            userName = doc.getString("userName") ?: "Unknown User",
-                            userProfileImageUrl = doc.getString("userProfileImageUrl") ?: "",
-                            content = content,
-                            imageUrls = imageUrls,
-                            timestamp = timestamp,
-                            likes = likedBy.size,
-                            isLikedByCurrentUser = currentUser?.uid?.let { uid -> likedBy.contains(uid) } ?: false,
-                            likedBy = likedBy,
-                            parentReplyId = parentReplyId
-                        )
+                        // Fetch nested replies
+                        val nestedRepliesSnapshot = doc.reference
+                            .collection("replies")
+                            .orderBy("timestamp", Query.Direction.ASCENDING)
+                            .get()
+                            .await()
+
+                        val nestedReplies = nestedRepliesSnapshot.documents.mapNotNull { nestedDoc ->
+                            try {
+                                parseReplyDocument(nestedDoc, currentUser?.uid)
+                            } catch (e: Exception) {
+                                Log.e("PostViewModel", "Error parsing nested reply: ${e.message}")
+                                null
+                            }
+                        }
+
+                        // Add reply with its nested replies
+                        topLevelReplies.add(reply.copy(nestedReplies = nestedReplies))
+
                     } catch (e: Exception) {
-                        Log.e("PostViewModel", "Error parsing reply: ${e.message}", e)
-                        null
+                        Log.e("PostViewModel", "Error processing reply: ${e.message}")
                     }
                 }
 
-                _replies.value = buildNestedReplies(allReplies)
+                _replies.value = topLevelReplies
+
             } catch (e: Exception) {
-                Log.e("PostViewModel", "Error fetching replies: ${e.message}", e)
+                Log.e("PostViewModel", "Error fetching replies: ${e.message}")
             }
         }
     }
+
 
     fun fetchUserReplies(userId: String) {
         viewModelScope.launch {
@@ -706,14 +841,31 @@ class PostViewModel : ViewModel() {
     fun repostReply(postId: String, replyId: String) {
         viewModelScope.launch {
             try {
+                val currentUser = auth.currentUser ?: return@launch
                 val replyRef = firestore.collection("posts")
                     .document(postId)
                     .collection("comments")
                     .document(replyId)
+
+                // Update the reposts count
                 replyRef.update("reposts", FieldValue.increment(1)).await()
+
+                // Update local state
+                updateReplyInState(replyId)
             } catch (e: Exception) {
                 Log.e("PostViewModel", "Error reposting reply: ${e.message}")
             }
+        }
+    }
+
+    private fun updateReplyInState(replyId: String) {
+        _replies.value = _replies.value.map { reply ->
+            if (reply.id == replyId) {
+                reply.copy(
+                    reposts = reply.reposts + 1
+                    // Don't set isRepostedByCurrentUser since it doesn't exist in Reply data class
+                )
+            } else reply
         }
     }
 
@@ -850,6 +1002,38 @@ class PostViewModel : ViewModel() {
                 Log.e("PostViewModel", "Error fetching user reposts: ${e.message}")
             }
         }
+    }
+
+
+    private suspend fun parseReplyDocument(doc: DocumentSnapshot, currentUserId: String?): Reply {
+        val userId = doc.getString("userId") ?: throw Exception("Missing userId")
+        val content = doc.getString("content") ?: ""
+        val timestamp = doc.getTimestamp("timestamp")?.toDate()
+        val likedBy = (doc.get("likedBy") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+        val imageUrls = (doc.get("imageUrls") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+        val replies = (doc.getLong("replies") ?: 0).toInt()
+
+        // Fetch user data from Realtime Database
+        val userSnapshot = database.getReference("users")
+            .child(userId)
+            .get()
+            .await()
+
+        return Reply(
+            id = doc.id,
+            userId = userId,
+            userName = userSnapshot.child("fullName").getValue(String::class.java) ?: "Unknown User",
+            userProfileImageUrl = userSnapshot.child("profileImageUrl").getValue(String::class.java) ?: "",
+            content = content,
+            imageUrls = imageUrls,
+            timestamp = timestamp,
+            likes = likedBy.size,
+            replies = replies,
+            isLikedByCurrentUser = currentUserId?.let { uid -> likedBy.contains(uid) } ?: false,
+            likedBy = likedBy,
+            parentReplyId = doc.getString("parentReplyId"),
+            nestedReplies = emptyList() // This will be populated separately for top-level replies
+        )
     }
 
     private suspend fun createNotification(

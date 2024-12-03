@@ -82,21 +82,25 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
             route = Routes.REPLY,
             arguments = listOf(
                 navArgument("postId") { type = NavType.StringType },
-                navArgument("username") { type = NavType.StringType },
+                navArgument("replyToUsername") { type = NavType.StringType },
                 navArgument("parentReplyId") {
                     type = NavType.StringType
-                    defaultValue = ""  // Add default value
-                    nullable = true    // Make it nullable
+                    nullable = true
+                    defaultValue = null
                 }
             )
         ) { backStackEntry ->
+            val postId = backStackEntry.arguments?.getString("postId") ?: return@composable
+            val replyToUsername = backStackEntry.arguments?.getString("replyToUsername") ?: return@composable
+            val parentReplyId = backStackEntry.arguments?.getString("parentReplyId")
+
             Reply(
                 navController = navController,
                 postViewModel = postViewModel,
                 authViewModel = authViewModel,
-                postId = backStackEntry.arguments?.getString("postId") ?: "",
-                replyToUsername = backStackEntry.arguments?.getString("username") ?: "",
-                parentReplyId = backStackEntry.arguments?.getString("parentReplyId")?.takeIf { it.isNotEmpty() }
+                postId = postId,
+                replyToUsername = replyToUsername,
+                parentReplyId = parentReplyId
             )
         }
 

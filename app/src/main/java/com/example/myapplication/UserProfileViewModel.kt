@@ -1,17 +1,20 @@
 package com.example.myapplication
 
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.storage.FirebaseStorage
-import com.google.firebase.storage.StorageReference
-import kotlinx.coroutines.launch
+import android.util.Log
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.myapplication.screens.Reply
 import com.example.myapplication.screens.Repost
 import com.example.myapplication.screens.UserProfile
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageReference
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 class UserProfileViewModel : ViewModel() {
 
@@ -21,10 +24,12 @@ class UserProfileViewModel : ViewModel() {
     val replies: MutableState<List<Reply>> = mutableStateOf(emptyList())
     val reposts: MutableState<List<Repost>> = mutableStateOf(emptyList())
     val isLoading = mutableStateOf(true)
+    val otherUserReplies: MutableState<List<Pair<Post, Reply>>> = mutableStateOf(emptyList()) // New state for replies by other users
 
     private val database = FirebaseDatabase.getInstance().reference
     private val firestore = FirebaseFirestore.getInstance()  // Firestore instance for posts, replies, and reposts
     private val storage = FirebaseStorage.getInstance().reference
+    private val auth = FirebaseAuth.getInstance()  // Firebase Auth instance for current user
 
     // Function to fetch real data from Firebase Realtime Database and Storage
     fun fetchUserData(userId: String) {
@@ -44,7 +49,7 @@ class UserProfileViewModel : ViewModel() {
 
                 // Fetch User Posts, Replies, and Reposts from Firestore
                 fetchUserPosts(userId)
-                fetchUserReplies(userId)
+                fetchOtherUserReplies(userId)
                 fetchUserReposts(userId)
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -85,22 +90,77 @@ class UserProfileViewModel : ViewModel() {
             }
     }
 
-    // Fetch Replies from Firestore
-    private fun fetchUserReplies(userId: String) {
-        firestore.collection("replies")
-            .whereEqualTo("userId", userId)
-            .get()
-            .addOnSuccessListener { querySnapshot ->
-                val repliesList = mutableListOf<Reply>()
-                for (document in querySnapshot.documents) {
-                    val reply = document.toObject(Reply::class.java)
-                    reply?.let { repliesList.add(it) }
+    // Fetch Replies by Other Users
+    fun fetchOtherUserReplies(targetUserId: String) {
+        viewModelScope.launch {
+            try {
+                Log.d("UserProfileViewModel", "Fetching replies for user $targetUserId")
+
+
+                val otherUserRepliesList = mutableListOf<Pair<Post, Reply>>()
+
+
+                // First, get all posts
+                val postsSnapshot = firestore.collection("posts")
+                    .get()
+                    .await()
+
+                // For each post, check for replies by the target user (other user)
+                for (postDoc in postsSnapshot.documents) {
+                    val post = postDoc.toObject(Post::class.java)?.copy(id = postDoc.id) ?: continue
+
+                    // Fetch replies for the specific post from the other user
+                    val repliesSnapshot = firestore.collection("posts")
+                        .document(postDoc.id)
+                        .collection("comments")
+                        .whereEqualTo("userId", targetUserId)
+                        .get()
+                        .await()
+
+                    for (replyDoc in repliesSnapshot.documents) {
+                        try {
+                            val content = replyDoc.getString("content") ?: ""
+                            val timestamp = replyDoc.getTimestamp("timestamp")?.toDate()
+                            val likedBy = (replyDoc.get("likedBy") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
+                            val userName = replyDoc.getString("userName") ?: ""
+                            val userProfileImageUrl = replyDoc.getString("userProfileImageUrl") ?: ""
+
+                            // Create the Reply object for this reply
+                            val reply = Reply(
+                                id = replyDoc.id,
+                                userId = targetUserId,
+                                userName = userName,
+                                userProfileImageUrl = userProfileImageUrl,
+                                content = content,
+                                timestamp = timestamp,
+                                likes = likedBy.size,
+                                isLikedByCurrentUser = likedBy.contains(auth.currentUser?.uid),
+                                likedBy = likedBy
+                            )
+
+                            // Add the post and its reply to the list
+                            otherUserRepliesList.add(Pair(post, reply))
+
+                            // Log the reply details
+                            Log.d("UserProfileViewModel", "Reply fetched: Content = $content, UserName = $userName, Timestamp = $timestamp")
+
+
+                        } catch (e: Exception) {
+                            Log.e("PostViewModel", "Error parsing reply: ${e.message}")
+                        }
+                    }
                 }
-                replies.value = repliesList
-            }.addOnFailureListener {
-                // Handle failure to fetch replies (optional)
-                println("Failed to load replies.")
+
+                // Sort replies by timestamp, most recent first
+                otherUserRepliesList.sortByDescending { it.second.timestamp }
+
+                // Update the state
+                otherUserReplies.value = otherUserRepliesList
+                Log.d("PostViewModel", "Fetched ${otherUserRepliesList.size} replies by other user")
+            } catch (e: Exception) {
+                Log.e("PostViewModel", "Error fetching other user replies: ${e.message}", e)
             }
+        }
     }
 
     // Fetch Reposts from Firestore

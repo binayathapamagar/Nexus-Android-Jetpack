@@ -1,6 +1,19 @@
 package com.example.myapplication.screens
 
-import androidx.compose.foundation.layout.*
+import android.annotation.SuppressLint
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -8,14 +21,33 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.Repeat
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Divider
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,11 +58,14 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import coil.compose.rememberImagePainter
 import com.example.myapplication.Post
 import com.example.myapplication.R
 import com.example.myapplication.UserProfileViewModel
 import com.example.myapplication.ui.theme.AppColors
+import com.example.myapplication.ui.theme.AppColors.Divider
 import com.example.myapplication.utils.toRelativeTimeString
+import java.text.SimpleDateFormat
 import java.util.Date
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -174,15 +209,20 @@ fun OtherUsers(
                         HorizontalDivider(
                             modifier = Modifier.fillMaxWidth(),
                             thickness = 1.dp,
-                            color = AppColors.Divider
+                            color = Divider
                         )
                     }
                     1 -> ContentList(replies, "No replies available") { reply ->
-                        ReplyItem(reply)
+                        ReplyItem(
+                            reply,
+                            post = Post(),
+                            onLikeClick = TODO(),
+                            onProfileClick = TODO()
+                        )
                         HorizontalDivider(
                             modifier = Modifier.fillMaxWidth(),
                             thickness = 1.dp,
-                            color = AppColors.Divider
+                            color = Divider
                         )
                     }
                     2 -> ContentList(reposts, "No reposts available") { repost ->
@@ -193,7 +233,7 @@ fun OtherUsers(
                         HorizontalDivider(
                             modifier = Modifier.fillMaxWidth(),
                             thickness = 1.dp,
-                            color = AppColors.Divider
+                            color = Divider
                         )
                     }
                 }
@@ -363,21 +403,68 @@ fun PostItem(
     }
 }
 
+@SuppressLint("SimpleDateFormat")
 @Composable
-fun ReplyItem(reply: Reply) {
+fun ReplyItem(
+    reply: Reply,
+    post: Post,
+    onLikeClick: (Reply) -> Unit,
+    onProfileClick: (String) -> Unit // For handling profile click
+) {
     Column(modifier = Modifier.padding(16.dp)) {
+        // User profile image and name
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Image(
+                painter = rememberImagePainter(reply.userProfileImageUrl),
+                contentDescription = "Profile Image",
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .clickable { onProfileClick(reply.userId) } // Handle profile click
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = reply.userName,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.bodyLarge
+            )
+        }
+
+        // Content of the reply
+        Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = reply.content,
             style = MaterialTheme.typography.bodyMedium
         )
+
+        // Timestamp and like functionality
         Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Replied by: ${reply.userName}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            IconButton(onClick = { onLikeClick(reply) }) {
+                Icon(
+                    imageVector = if (reply.isLikedByCurrentUser) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                    contentDescription = "Like"
+                )
+            }
+
+            Text(text = "${reply.likes} likes", style = MaterialTheme.typography.bodyMedium)
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Text(
+                text = reply.timestamp?.let { SimpleDateFormat("HH:mm").format(it) } ?: "Just now",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        }
+
+        // Divider or separator between replies
+        Divider(modifier = Modifier.padding(vertical = 8.dp))
     }
 }
+
 
 @Composable
 fun RepostItem(repost: Repost, posts: List<Post>) {
@@ -435,7 +522,7 @@ data class Reply(
     val userProfileImageUrl: String = "",
     val content: String = "",
     val imageUrls: List<String> = emptyList(), // Added image support
-    val timestamp: java.util.Date? = null,
+    val timestamp: Date? = null,
     val likes: Int = 0,
     val replies: Int = 0,
     val reposts: Int = 0,

@@ -1,18 +1,45 @@
 package com.example.myapplication.screens
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -29,6 +56,7 @@ import com.example.myapplication.models.Post
 import com.example.myapplication.models.Reply
 import com.example.myapplication.models.UserProfile
 import com.example.myapplication.navigation.Routes
+import com.example.myapplication.ui.theme.AppColors
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -94,7 +122,6 @@ fun OtherUsers(
                     userReplies = userReplies,
                     userReposts = userReposts,
                     postViewModel = postViewModel,
-                    navController = navController,
                     parentNavController = parentNavController  // Add this
                 )
             }
@@ -169,12 +196,18 @@ private fun UserProfileHeader(
         Button(
             onClick = onFollowClick,
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp)
+            shape = RoundedCornerShape(8.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor  = Color.Black, // Set background to black
+                contentColor = Color.White // Set text color to white
+            )
+
         ) {
             Text("Follow")
         }
     }
 }
+
 
 @Composable
 private fun TabSection(
@@ -184,7 +217,6 @@ private fun TabSection(
     userReplies: List<Pair<Post, Reply>>,
     userReposts: List<Post>,
     postViewModel: PostViewModel,
-    navController: NavController,
     parentNavController: NavController  // Add this parameter
 ) {
     Column {
@@ -193,15 +225,17 @@ private fun TabSection(
                 Tab(
                     selected = selectedTabIndex == index,
                     onClick = { onTabSelected(index) },
-                    text = { Text(title) }
+                    text = { Text(title) },
+                    selectedContentColor  = AppColors.TextPrimary,
+                    unselectedContentColor = AppColors.TextSecondary
                 )
             }
         }
 
         when (selectedTabIndex) {
-            0 -> ThreadsTab(userPosts, postViewModel, navController, parentNavController)
-            1 -> RepliesTab(userReplies, postViewModel, navController, parentNavController)
-            2 -> RepostsTab(userReposts, postViewModel, navController, parentNavController)
+            0 -> ThreadsTab(userPosts, postViewModel,  parentNavController)
+            1 -> RepliesTab(userReplies, postViewModel, parentNavController)
+            2 -> RepostsTab(userReposts, postViewModel ,parentNavController)
         }
     }
 }
@@ -210,7 +244,7 @@ private fun TabSection(
 private fun ThreadsTab(
     posts: List<Post>,
     postViewModel: PostViewModel,
-    navController: NavController,
+
     parentNavController: NavController
 ) {
     LazyColumn {
@@ -235,7 +269,6 @@ private fun ThreadsTab(
 private fun RepliesTab(
     replies: List<Pair<Post, Reply>>,
     postViewModel: PostViewModel,
-    navController: NavController,
     parentNavController: NavController
 ) {
     if (replies.isEmpty()) {
@@ -285,7 +318,6 @@ private fun RepliesTab(
 private fun RepostsTab(
     reposts: List<Post>,
     postViewModel: PostViewModel,
-    navController: NavController,
     parentNavController: NavController
 ) {
     if (reposts.isEmpty()) {

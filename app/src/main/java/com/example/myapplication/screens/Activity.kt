@@ -4,15 +4,42 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.AlternateEmail
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.outlined.ChatBubble
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,10 +55,10 @@ import com.example.myapplication.R
 import com.example.myapplication.models.Notification
 import com.example.myapplication.models.NotificationType
 import com.example.myapplication.ui.theme.AppColors
-import com.example.myapplication.viewmodels.NotificationViewModel
 import com.example.myapplication.utils.toRelativeTimeString
+import com.example.myapplication.viewmodels.NotificationViewModel
 
-//@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Activity(
     modifier: Modifier = Modifier,
@@ -40,7 +67,7 @@ fun Activity(
 ) {
     val notifications by notificationViewModel.notifications.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("All", "Follows", "Replies", "Reposts")
+    val tabs = listOf("All", "Follows", "Replies", "Reposts", "Mentions")
 
     Column(
         modifier = modifier
@@ -54,19 +81,18 @@ fun Activity(
             modifier = Modifier.padding(16.dp)
         )
 
-        Row(
+        LazyRow(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp)
-                .background(AppColors.White),
-            horizontalArrangement = Arrangement.SpaceBetween
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            contentPadding = PaddingValues(horizontal = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp) // Space between tabs
         ) {
-            tabs.forEachIndexed { index, title ->
+            items(tabs.size) { index ->
                 val isSelected = selectedTab == index
                 Box(
                     modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 4.dp)
+                        .size(width = 112.dp, height = 42.dp) // Set fixed size
                         .clip(MaterialTheme.shapes.medium)
                         .background(
                             if (isSelected) AppColors.Black else AppColors.White
@@ -77,11 +103,11 @@ fun Activity(
                             shape = MaterialTheme.shapes.medium
                         )
                         .clickable { selectedTab = index }
-                        .padding(vertical = 12.dp),
+                        .padding(vertical = 12.dp, horizontal = 16.dp), // Adjust padding for better width
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = title,
+                        text = tabs[index],
                         color = if (isSelected) AppColors.White else AppColors.Black,
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Bold
@@ -89,6 +115,7 @@ fun Activity(
                 }
             }
         }
+
 
         if (notifications.isEmpty()) {
             Box(

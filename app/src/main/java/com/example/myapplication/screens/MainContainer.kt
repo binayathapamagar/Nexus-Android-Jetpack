@@ -118,7 +118,8 @@ fun MainContainer(
                 composable("home") {
                     Home(
                         navController = parentNavController,
-                        postViewModel = parentPostViewModel
+                        postViewModel = parentPostViewModel,
+                        authViewModel = authViewModel
                     )
                 }
                 composable("search") {

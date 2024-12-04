@@ -1,17 +1,21 @@
 package com.example.myapplication.viewmodels
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.myapplication.models.Notification
+import com.example.myapplication.models.NotificationType
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import com.example.myapplication.models.Notification
-import com.google.firebase.firestore.ListenerRegistration
+import java.util.Date
 
 class NotificationViewModel : ViewModel() {
     private val firestore = FirebaseFirestore.getInstance()
@@ -29,6 +33,7 @@ class NotificationViewModel : ViewModel() {
         startListeningForNotifications()
     }
 
+    // Start listening for notifications related to the current user
     fun startListeningForNotifications() {
         val currentUser = auth.currentUser ?: return
 
@@ -62,6 +67,7 @@ class NotificationViewModel : ViewModel() {
             }
     }
 
+    // Mark all notifications as read
     fun markAllNotificationsAsRead() {
         viewModelScope.launch {
             try {
@@ -87,6 +93,7 @@ class NotificationViewModel : ViewModel() {
         }
     }
 
+    // Mark a specific notification as read
     fun markAsRead(notificationId: String) {
         viewModelScope.launch {
             try {
@@ -106,6 +113,54 @@ class NotificationViewModel : ViewModel() {
         }
     }
 
+    fun saveNotification(recipientID:String, actionType: NotificationType, postId: String, postContent:String) {
+        val currentUser  = auth.currentUser
+        if (currentUser  == null) {
+            println("Error: User not logged in")
+            return
+        }
+
+        // Reference to the user's data in the Realtime Database
+        val userDatabaseRef = FirebaseDatabase.getInstance().getReference("users").child(currentUser .uid)
+
+        viewModelScope.launch {
+            try {
+                // Fetch user details from the Realtime Database
+                val userSnapshot = userDatabaseRef.get().await()
+                if (userSnapshot.exists()) {
+                    val username = userSnapshot.child("username").getValue(String::class.java) ?: "Unknown User"
+                    val profileImageUrl = userSnapshot.child("profileImageUrl").getValue(String::class.java) ?: ""
+
+                    // Create the notification object
+                    val notification = Notification(
+                        id = "",
+                        recipientId = recipientID,
+                        senderId = currentUser .uid,
+                        senderName = username,
+                        senderProfileUrl = profileImageUrl,
+                        type = actionType,
+                        postId = postId,
+                        postContent = postContent,
+                        timestamp = Date(),
+                        read = false
+                    )
+
+                    Log.d("NotificationDebug", "Recipient ID: $recipientID, Action Type: $actionType, Post ID: $postId, Post Content: $postContent")
+                    // Save the notification to Firestore
+                    firestore.collection("notifications")
+                        .add(notification)
+                        .await()
+                    println("Notification saved for action: $actionType")
+                } else {
+                    println("User  data not found for UID: ${currentUser .uid}")
+                }
+            } catch (e: Exception) {
+                println("Error saving notification: $e")
+            }
+        }
+    }
+
+    // Clear the notifications listener when the ViewModel is cleared
     override fun onCleared() {
         super.onCleared()
         notificationsListener?.remove()

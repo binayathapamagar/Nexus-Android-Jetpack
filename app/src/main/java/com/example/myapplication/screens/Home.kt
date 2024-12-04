@@ -318,16 +318,20 @@ fun PostItem(
                             isLiked = !isLiked
                             postViewModel.likePost(post.id, isLiked)
 
-                            try{
-                            notificationViewModel.saveNotification(
-                                recipientID = post.userId,
-                                actionType = NotificationType.LIKE,
-                                postId = post.id,
-                                postContent = post.content
+                            try {
+                                notificationViewModel.saveNotification(
+                                    recipientID = post.userId,
+                                    actionType = NotificationType.LIKE,
+                                    postId = post.id,
+                                    postContent = post.content
 
-                            )} catch (e: Exception) {
-                        Log.e("NotificationError", "Error saving notification: ${e.message}")
-                    }
+                                )
+                            } catch (e: Exception) {
+                                Log.e(
+                                    "NotificationError",
+                                    "Error saving notification: ${e.message}"
+                                )
+                            }
 
                         }
                     )
@@ -340,6 +344,21 @@ fun PostItem(
                         iconType = CustomIconType.COMMENT,
                         onClick = {
                             navController.navigate(Routes.createReplyRoute(post.id, post.userName))
+
+                            try {
+                                notificationViewModel.saveNotification(
+                                    recipientID = post.userId,
+                                    actionType = NotificationType.COMMENT,
+                                    postId = post.id,
+                                    postContent = post.content
+
+                                )
+                            } catch (e: Exception) {
+                                Log.e(
+                                    "NotificationError",
+                                    "Error saving notification: ${e.message}"
+                                )
+                            }
                         }
                     )
 
@@ -357,6 +376,22 @@ fun PostItem(
                             } else {
                                 postViewModel.repostPost(post.id)
                                 isReposted = true
+                            }
+
+
+                            try {
+                                notificationViewModel.saveNotification(
+                                    recipientID = post.userId,
+                                    actionType = NotificationType.REPOST,
+                                    postId = post.id,
+                                    postContent = post.content
+
+                                )
+                            } catch (e: Exception) {
+                                Log.e(
+                                    "NotificationError",
+                                    "Error saving notification: ${e.message}"
+                                )
                             }
                         }
                     )

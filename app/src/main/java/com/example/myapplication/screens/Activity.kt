@@ -1,5 +1,6 @@
 package com.example.myapplication.screens
 
+import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -49,11 +50,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.navigation.NavHostController
+import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.myapplication.R
 import com.example.myapplication.models.Notification
 import com.example.myapplication.models.NotificationType
+import com.example.myapplication.navigation.Routes
 import com.example.myapplication.ui.theme.AppColors
 import com.example.myapplication.utils.toRelativeTimeString
 import com.example.myapplication.viewmodels.NotificationViewModel
@@ -63,7 +65,7 @@ import com.example.myapplication.viewmodels.NotificationViewModel
 fun Activity(
     modifier: Modifier = Modifier,
     notificationViewModel: NotificationViewModel = viewModel(),
-    navController: NavHostController
+    navController: NavController
 ) {
     val notifications by notificationViewModel.notifications.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -146,7 +148,13 @@ fun Activity(
                         onMarkAsRead = { notificationViewModel.markAsRead(notification.id) },
                         onNotificationClick = {
                             notification.postId?.let { postId ->
-                                navController.navigate("thread/$postId")
+                                // Log the postId to verify it's not null
+                                Log.d("Activity", "Navigating to thread with postId: $postId")
+                                navController.navigate(Routes.createThreadRoute(postId))
+                            } ?: run {
+                                // Log an error message if postId is null
+                                Log.e("Activity", "Post ID is null for notification: ${notification.id}")
+                                // Optionally, show a message to the user or handle the error gracefully
                             }
                         }
                     )

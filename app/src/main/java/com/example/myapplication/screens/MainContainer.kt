@@ -172,6 +172,15 @@ fun MainContainer(
                         userId = userId
                     )
                 }
+                composable("thread/{postId}") { backStackEntry ->
+                    val postId = backStackEntry.arguments?.getString("postId") ?: ""
+                    com.example.myapplication.screens.Thread(
+                        navController = navController,
+                        postViewModel = parentPostViewModel,
+                        postId
+                    )
+                }
+
             }
         }
     }

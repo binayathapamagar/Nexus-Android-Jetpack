@@ -137,6 +137,7 @@ fun Activity(
                         1 -> notification.type == NotificationType.FOLLOW
                         2 -> notification.type == NotificationType.COMMENT
                         3 -> notification.type == NotificationType.REPOST
+                        4 -> notification.type == NotificationType.MENTION
                         else -> true
                     }
                 }) { notification ->

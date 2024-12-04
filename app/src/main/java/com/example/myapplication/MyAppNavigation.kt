@@ -11,7 +11,16 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.myapplication.navigation.Routes
-import com.example.myapplication.screens.*
+import com.example.myapplication.screens.Home
+import com.example.myapplication.screens.Login
+import com.example.myapplication.screens.MainContainer
+import com.example.myapplication.screens.NewPost
+import com.example.myapplication.screens.PostReplies
+import com.example.myapplication.screens.Reply
+import com.example.myapplication.screens.SearchScreen
+import com.example.myapplication.screens.Settings
+import com.example.myapplication.screens.SignUp
+import com.example.myapplication.screens.Thread
 
 @Composable
 fun MyAppNavigation(authViewModel: AuthViewModel) {
@@ -56,8 +65,7 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
         composable(Routes.HOME) {
             Home(
                 navController = navController,
-                postViewModel = postViewModel,
-                authViewModel = authViewModel
+                postViewModel = postViewModel
             )
         }
 

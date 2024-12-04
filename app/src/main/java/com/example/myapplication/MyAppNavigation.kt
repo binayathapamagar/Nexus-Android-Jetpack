@@ -65,7 +65,8 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
         composable(Routes.HOME) {
             Home(
                 navController = navController,
-                postViewModel = postViewModel
+                postViewModel = postViewModel,
+                authViewModel = authViewModel
             )
         }
 

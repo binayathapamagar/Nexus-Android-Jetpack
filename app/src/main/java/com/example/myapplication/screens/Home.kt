@@ -24,8 +24,15 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Gif
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -57,6 +64,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.example.myapplication.AuthViewModel
 import com.example.myapplication.PostViewModel
 import com.example.myapplication.R
 import com.example.myapplication.components.CustomIcon
@@ -74,9 +82,12 @@ import kotlinx.coroutines.delay
 @Composable
 fun Home(
     navController: NavController,
-    postViewModel: PostViewModel = viewModel()
+    postViewModel: PostViewModel = viewModel(),
+    authViewModel: AuthViewModel
 ) {
     val posts by postViewModel.posts.collectAsState()
+    val profileImageUrl by authViewModel.profileImageUrl.collectAsState()
+    val userName by authViewModel.userName.collectAsState()
     var isLoading by remember { mutableStateOf(true) }
 
     // Fetch posts when the composable is launched
@@ -101,15 +112,32 @@ fun Home(
                     modifier = Modifier.size(40.dp)
                 )
             }
+
         }
-    ) { innerPadding ->
+    ) {
+        innerPadding ->
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+
+            item {
+                NewPostSection(
+                    profileImageUrl = profileImageUrl,
+                    userName = userName ?: "User",
+                    onNewPostClick = { navController.navigate(Routes.NEW_POST) },
+                    onIconClick = { navController.navigate(Routes.NEW_POST) },
+                )
+                HorizontalDivider(
+                    thickness = 1.dp,
+                    color = AppColors.Divider
+                )
+            }
+
             if (isLoading) {
+
                 // Show shimmer effect while loading
                 items(8) {
                     ShimmerListItem() // Replace with your shimmer composable
@@ -680,6 +708,111 @@ fun FullScreenImageViewer(
                 Text(
                     text = "${pagerState.currentPage + 1} / ${imageUrls.size}",
                     color = Color.White
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun NewPostSection(
+    profileImageUrl: String?,
+    userName: String,
+    onNewPostClick: () -> Unit,
+    onIconClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onNewPostClick)
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onNewPostClick),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AsyncImage(
+                model = profileImageUrl,
+                contentDescription = "Profile Picture",
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop,
+                error = painterResource(id = R.drawable.person)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onNewPostClick)
+            ) {
+                Text(
+                    text = userName,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                )
+                Text(
+                    text = "What's new?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Updated icon buttons to use IconButton for better touch feedback
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Image,
+                    contentDescription = "Add Image",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Camera,
+                    contentDescription = "Take Photo",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Gif,
+                    contentDescription = "Add GIF",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Mic,
+                    contentDescription = "Voice Recording",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Tag,
+                    contentDescription = "Add Hashtag",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.AutoMirrored.Filled.List,
+                    contentDescription = "Add List",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.LocationOn,
+                    contentDescription = "Add Location",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
         }

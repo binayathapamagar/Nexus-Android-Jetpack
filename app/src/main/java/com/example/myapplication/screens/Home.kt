@@ -29,8 +29,15 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Gif
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Repeat
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -88,8 +95,11 @@ fun Home(
     navController: NavController,
     authViewModel: AuthViewModel,
     postViewModel: PostViewModel = viewModel()
+
 ) {
     val posts by postViewModel.posts.collectAsState()
+    val profileImageUrl by authViewModel.profileImageUrl.collectAsState()
+    val userName by authViewModel.userName.collectAsState()
     var isLoading by remember { mutableStateOf(true) }
     val listState = rememberLazyListState()
     var isFabPressed by remember { mutableStateOf(false) }
@@ -161,6 +171,7 @@ fun Home(
                     Spacer(modifier = Modifier.height(64.dp))
                 }
             }
+
         }
 
         // Floating Action Button
@@ -174,6 +185,7 @@ fun Home(
                     isFabPressed = true
                     // Add small delay before navigation
                     navController.navigate(Routes.NEW_POST)
+
                 }
 //                .background(Color.Black)
                 .size(55.dp),
@@ -395,16 +407,20 @@ fun PostItem(
                             isLiked = !isLiked
                             postViewModel.likePost(post.id, isLiked)
 
-                            try{
-                            notificationViewModel.saveNotification(
-                                recipientID = post.userId,
-                                actionType = NotificationType.LIKE,
-                                postId = post.id,
-                                postContent = post.content
+                            try {
+                                notificationViewModel.saveNotification(
+                                    recipientID = post.userId,
+                                    actionType = NotificationType.LIKE,
+                                    postId = post.id,
+                                    postContent = post.content
 
-                            )} catch (e: Exception) {
-                        Log.e("NotificationError", "Error saving notification: ${e.message}")
-                    }
+                                )
+                            } catch (e: Exception) {
+                                Log.e(
+                                    "NotificationError",
+                                    "Error saving notification: ${e.message}"
+                                )
+                            }
 
                         }
                     )
@@ -417,6 +433,21 @@ fun PostItem(
                         iconType = CustomIconType.COMMENT,
                         onClick = {
                             navController.navigate(Routes.createReplyRoute(post.id, post.userName))
+
+                            try {
+                                notificationViewModel.saveNotification(
+                                    recipientID = post.userId,
+                                    actionType = NotificationType.COMMENT,
+                                    postId = post.id,
+                                    postContent = post.content
+
+                                )
+                            } catch (e: Exception) {
+                                Log.e(
+                                    "NotificationError",
+                                    "Error saving notification: ${e.message}"
+                                )
+                            }
                         }
                     )
 
@@ -434,6 +465,22 @@ fun PostItem(
                             } else {
                                 postViewModel.repostPost(post.id)
                                 isReposted = true
+                            }
+
+
+                            try {
+                                notificationViewModel.saveNotification(
+                                    recipientID = post.userId,
+                                    actionType = NotificationType.REPOST,
+                                    postId = post.id,
+                                    postContent = post.content
+
+                                )
+                            } catch (e: Exception) {
+                                Log.e(
+                                    "NotificationError",
+                                    "Error saving notification: ${e.message}"
+                                )
                             }
                         }
                     )
@@ -722,6 +769,111 @@ fun FullScreenImageViewer(
                 Text(
                     text = "${pagerState.currentPage + 1} / ${imageUrls.size}",
                     color = Color.White
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun NewPostSection(
+    profileImageUrl: String?,
+    userName: String,
+    onNewPostClick: () -> Unit,
+    onIconClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable(onClick = onNewPostClick)
+            .padding(16.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onNewPostClick),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AsyncImage(
+                model = profileImageUrl,
+                contentDescription = "Profile Picture",
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop,
+                error = painterResource(id = R.drawable.person)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable(onClick = onNewPostClick)
+            ) {
+                Text(
+                    text = userName,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold)
+                )
+                Text(
+                    text = "What's new?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            // Updated icon buttons to use IconButton for better touch feedback
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Image,
+                    contentDescription = "Add Image",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Camera,
+                    contentDescription = "Take Photo",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Gif,
+                    contentDescription = "Add GIF",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Mic,
+                    contentDescription = "Voice Recording",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.Tag,
+                    contentDescription = "Add Hashtag",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.AutoMirrored.Filled.List,
+                    contentDescription = "Add List",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+            }
+            IconButton(onClick = onIconClick) {
+                Icon(
+                    Icons.Default.LocationOn,
+                    contentDescription = "Add Location",
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                 )
             }
         }

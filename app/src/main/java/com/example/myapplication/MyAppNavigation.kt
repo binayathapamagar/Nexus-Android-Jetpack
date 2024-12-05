@@ -77,6 +77,7 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
                 navController = navController,
                 authViewModel = authViewModel,
                 postViewModel = postViewModel
+
             )
         }
 

@@ -89,8 +89,18 @@ fun MainContainer(
                     followViewModel = followViewModel
                 )
                 LaunchedEffect(Unit) {
-                    notificationViewModel.markAllNotificationsAsRead()
+                    notificationViewModel.markAllNotificationsAsRead()}
+
                 }
+                composable("thread/{postId}") { backStackEntry ->
+                    val postId = backStackEntry.arguments?.getString("postId") ?: ""
+                    com.example.myapplication.screens.Thread(
+                        navController = navController,
+                        postViewModel = parentPostViewModel,
+                        postId
+                    )
+                }
+
             }
             composable("profile") {
                 Profile(

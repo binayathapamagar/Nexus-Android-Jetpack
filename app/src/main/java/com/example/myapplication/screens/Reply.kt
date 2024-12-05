@@ -274,7 +274,6 @@ fun Reply(
                                 postViewModel.addReply(
                                     postId = postId,
                                     replyContent = replyText,
-                                    imageUris = selectedImages,
                                     parentReplyId = parentReplyId
                                 )
                                 navController.navigateUp()

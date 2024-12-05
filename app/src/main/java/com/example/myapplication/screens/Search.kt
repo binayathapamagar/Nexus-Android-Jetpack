@@ -26,6 +26,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -216,12 +217,12 @@ fun UserRow(user: User, navController: NavController) {
         }
 
         // Divider after the profile picture and user details, spanning the full width of the screen
-        Divider(
-            color = Color.Gray,
-            thickness = 0.5.dp,
+        HorizontalDivider(
             modifier = Modifier
                 .fillMaxWidth() // Ensures the divider spans the full width
-                .padding(start = 56.dp) // Offset the divider to start after the profile picture
+                .padding(start = 56.dp), // Offset the divider to start after the profile picture
+            thickness = 0.5.dp,
+            color = Color.Gray
         )
     }
 }

@@ -1,125 +1,147 @@
 package com.example.myapplication
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.storage.FirebaseStorage
-import com.google.firebase.storage.StorageReference
 import kotlinx.coroutines.launch
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import com.example.myapplication.models.Post
 import com.example.myapplication.models.Reply
 import com.example.myapplication.models.Repost
 import com.example.myapplication.models.UserProfile
+import com.google.firebase.database.FirebaseDatabase
 
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.tasks.await
 
 class UserProfileViewModel : ViewModel() {
-
-    // Mutable state for UI updates
-    val userProfile: MutableState<UserProfile?> = mutableStateOf(null)
-    val posts: MutableState<List<Post>> = mutableStateOf(emptyList())
-    val replies: MutableState<List<Reply>> = mutableStateOf(emptyList())
-    val reposts: MutableState<List<Repost>> = mutableStateOf(emptyList())
+    private val firestore = FirebaseFirestore.getInstance()
+    private val database = FirebaseDatabase.getInstance()
     val isLoading = mutableStateOf(true)
 
-    private val database = FirebaseDatabase.getInstance().reference
-    private val firestore = FirebaseFirestore.getInstance()  // Firestore instance for posts, replies, and reposts
-    private val storage = FirebaseStorage.getInstance().reference
+    private val _userProfile = MutableStateFlow<UserProfile?>(null)
+    val userProfile: StateFlow<UserProfile?> = _userProfile
 
-    // Function to fetch real data from Firebase Realtime Database and Storage
+    private val _posts = MutableStateFlow<List<Post>>(emptyList())
+    val posts: StateFlow<List<Post>> = _posts
+
+    private val _replies = MutableStateFlow<List<Reply>>(emptyList())
+    val replies: StateFlow<List<Reply>> = _replies
+
+    private val _reposts = MutableStateFlow<List<Repost>>(emptyList())
+    val reposts: StateFlow<List<Repost>> = _reposts
+
     fun fetchUserData(userId: String) {
         viewModelScope.launch {
             try {
-                // Fetch User Profile from Realtime Database
-                val userRef = database.child("users").child(userId)
-                userRef.get().addOnSuccessListener { dataSnapshot ->
-                    val userProfileData = dataSnapshot.getValue(UserProfile::class.java)
-                    if (userProfileData != null) {
-                        userProfile.value = userProfileData
+                isLoading.value = true
 
-                        // Fetch Profile Image URL from Firebase Storage
-                        fetchProfileImage(userProfileData.profileImageUrl)
-                    }
-                }
+                // Fetch user data from Realtime Database
+                val userSnapshot = database.getReference("users")
+                    .child(userId)
+                    .get()
+                    .await()
 
-                // Fetch User Posts, Replies, and Reposts from Firestore
-                fetchUserPosts(userId)
-                fetchUserReplies(userId)
-                fetchUserReposts(userId)
+                // Fetch user stats from Firestore
+                val statsDoc = firestore.collection("userStats")
+                    .document(userId)
+                    .get()
+                    .await()
+
+                val followersCount = statsDoc.getLong("followersCount")?.toInt() ?: 0
+                val followingCount = statsDoc.getLong("followingCount")?.toInt() ?: 0
+
+                val profile = UserProfile(
+                    userId = userId,
+                    fullName = userSnapshot.child("fullName").getValue(String::class.java) ?: "",
+                    username = userSnapshot.child("username").getValue(String::class.java) ?: "",
+                    bio = userSnapshot.child("bio").getValue(String::class.java) ?: "",
+                    profileImageUrl = userSnapshot.child("profileImageUrl").getValue(String::class.java) ?: "",
+                    followersCount = followersCount,
+                    followingCount = followingCount
+                )
+
+                _userProfile.value = profile
+
+                // Load user's content
+                loadUserContent(userId)
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e("UserProfileViewModel", "Error fetching user data: ${e.message}")
             } finally {
                 isLoading.value = false
             }
         }
     }
 
-    // Fetch Profile Image from Firebase Storage
-    private fun fetchProfileImage(storagePath: String) {
-        val profileImageRef: StorageReference = storage.child("profile_pictures/$storagePath")
-        profileImageRef.downloadUrl.addOnSuccessListener { uri ->
-            val profileImageUrl = uri.toString()
-            // Update UserProfile with the image URL
-            userProfile.value?.profileImageUrl = profileImageUrl
-        }.addOnFailureListener {
-            // Handle failure to fetch profile image (optional)
-            println("Failed to load profile image.")
+    private suspend fun loadUserContent(userId: String) {
+        try {
+            // Fetch posts
+            val postsSnapshot = firestore.collection("posts")
+                .whereEqualTo("userId", userId)
+                .orderBy("timestamp", Query.Direction.DESCENDING)
+                .get()
+                .await()
+
+            val userPosts = postsSnapshot.documents.mapNotNull { doc ->
+                doc.toObject(Post::class.java)?.copy(id = doc.id)
+            }
+            _posts.value = userPosts
+
+            // Fetch replies
+            val allPosts = firestore.collection("posts").get().await()
+            val userReplies = mutableListOf<Reply>()
+
+            allPosts.documents.forEach { postDoc ->
+                val repliesSnapshot = postDoc.reference.collection("comments")
+                    .whereEqualTo("userId", userId)
+                    .get()
+                    .await()
+
+                repliesSnapshot.documents.forEach { replyDoc ->
+                    replyDoc.toObject(Reply::class.java)?.let {
+                        userReplies.add(it.copy(id = replyDoc.id))
+                    }
+                }
+            }
+            _replies.value = userReplies
+
+            // Fetch reposts
+            val repostsSnapshot = firestore.collection("reposts")
+                .whereEqualTo("repostedByUserId", userId)
+                .get()
+                .await()
+
+            val userReposts = repostsSnapshot.documents.mapNotNull { doc ->
+                doc.toObject(Repost::class.java)?.copy(id = doc.id)
+            }
+            _reposts.value = userReposts
+
+        } catch (e: Exception) {
+            Log.e("UserProfileViewModel", "Error loading user content: ${e.message}")
         }
     }
 
-    // Fetch Posts from Firestore
-    private fun fetchUserPosts(userId: String) {
-        firestore.collection("posts")
-            .whereEqualTo("userId", userId)
-            .get()
-            .addOnSuccessListener { querySnapshot ->
-                val postsList = mutableListOf<Post>()
-                for (document in querySnapshot.documents) {
-                    val post = document.toObject(Post::class.java)
-                    post?.let { postsList.add(it) }
-                }
-                posts.value = postsList
-            }.addOnFailureListener {
-                // Handle failure to fetch posts (optional)
-                println("Failed to load posts.")
-            }
-    }
+    fun refreshUserStats(userId: String) {
+        viewModelScope.launch {
+            try {
+                val statsDoc = firestore.collection("userStats")
+                    .document(userId)
+                    .get()
+                    .await()
 
-    // Fetch Replies from Firestore
-    private fun fetchUserReplies(userId: String) {
-        firestore.collection("replies")
-            .whereEqualTo("userId", userId)
-            .get()
-            .addOnSuccessListener { querySnapshot ->
-                val repliesList = mutableListOf<Reply>()
-                for (document in querySnapshot.documents) {
-                    val reply = document.toObject(Reply::class.java)
-                    reply?.let { repliesList.add(it) }
-                }
-                replies.value = repliesList
-            }.addOnFailureListener {
-                // Handle failure to fetch replies (optional)
-                println("Failed to load replies.")
-            }
-    }
+                val followersCount = statsDoc.getLong("followersCount")?.toInt() ?: 0
+                val followingCount = statsDoc.getLong("followingCount")?.toInt() ?: 0
 
-    // Fetch Reposts from Firestore
-    private fun fetchUserReposts(userId: String) {
-        firestore.collection("reposts")
-            .whereEqualTo("userId", userId)
-            .get()
-            .addOnSuccessListener { querySnapshot ->
-                val repostsList = mutableListOf<Repost>()
-                for (document in querySnapshot.documents) {
-                    val repost = document.toObject(Repost::class.java)
-                    repost?.let { repostsList.add(it) }
-                }
-                reposts.value = repostsList
-            }.addOnFailureListener {
-                // Handle failure to fetch reposts (optional)
-                println("Failed to load reposts.")
+                _userProfile.value = _userProfile.value?.copy(
+                    followersCount = followersCount,
+                    followingCount = followingCount
+                )
+            } catch (e: Exception) {
+                Log.e("UserProfileViewModel", "Error refreshing stats: ${e.message}")
             }
+        }
     }
 }

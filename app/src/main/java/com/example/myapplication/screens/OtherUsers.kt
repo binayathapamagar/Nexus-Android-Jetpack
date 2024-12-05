@@ -14,11 +14,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -39,9 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,43 +47,38 @@ import coil.compose.AsyncImage
 import com.example.myapplication.PostViewModel
 import com.example.myapplication.R
 import com.example.myapplication.UserProfileViewModel
+import com.example.myapplication.components.FollowButton
+import com.example.myapplication.components.FollowStats
 import com.example.myapplication.models.Post
 import com.example.myapplication.models.Reply
 import com.example.myapplication.models.UserProfile
 import com.example.myapplication.navigation.Routes
 import com.example.myapplication.ui.theme.AppColors
+import com.example.myapplication.viewmodels.FollowViewModel
 
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OtherUsers(
     navController: NavController,
-    parentNavController: NavController,  // Add this parameter
-    userId: String,
+    parentNavController: NavController,
+    userId: String
 ) {
     val userProfileViewModel: UserProfileViewModel = viewModel()
     val postViewModel: PostViewModel = viewModel()
-
-    // Fetch user data when the screen is first displayed
-    LaunchedEffect(userId) {
-        userProfileViewModel.fetchUserData(userId)
-    }
+    val followViewModel: FollowViewModel = viewModel()
 
     var selectedTab by remember { mutableIntStateOf(0) }
-    val userProfile = userProfileViewModel.userProfile.value
+    val userProfile by userProfileViewModel.userProfile.collectAsState()
     val posts by postViewModel.posts.collectAsState()
     val userPosts = posts.filter { it.userId == userId }
     val userReplies by postViewModel.userReplies.collectAsState()
     val userReposts by postViewModel.userReposts.collectAsState()
     val isLoading = userProfileViewModel.isLoading.value
 
-    // Fetch appropriate data based on selected tab
-    LaunchedEffect(selectedTab) {
-        when (selectedTab) {
-            0 -> postViewModel.fetchPosts() // Threads
-            1 -> postViewModel.fetchUserReplies(userId) // Replies
-            2 -> postViewModel.fetchUserReposts(userId) // Reposts
-        }
+    LaunchedEffect(userId) {
+        userProfileViewModel.fetchUserData(userId)
+        followViewModel.subscribeToFollowUpdates(userId)
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -96,9 +86,8 @@ fun OtherUsers(
             CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
         } else {
             Column(modifier = Modifier.fillMaxSize()) {
-                // TopAppBar with back navigation
                 TopAppBar(
-                    title = { Text("") },
+                    title = { },
                     navigationIcon = {
                         IconButton(onClick = { navController.popBackStack() }) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -106,15 +95,13 @@ fun OtherUsers(
                     }
                 )
 
-                // User Profile Section
                 userProfile?.let { profile ->
                     UserProfileHeader(
                         profile = profile,
-                        onFollowClick = { /* Implement follow functionality */ }
+                        followViewModel = followViewModel
                     )
                 }
 
-                // Tabs and Content
                 TabSection(
                     selectedTabIndex = selectedTab,
                     onTabSelected = { selectedTab = it },
@@ -122,24 +109,27 @@ fun OtherUsers(
                     userReplies = userReplies,
                     userReposts = userReposts,
                     postViewModel = postViewModel,
-                    parentNavController = parentNavController  // Add this
+                    parentNavController = parentNavController
                 )
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun UserProfileHeader(
+fun UserProfileHeader(
     profile: UserProfile,
-    onFollowClick: () -> Unit,
+    followViewModel: FollowViewModel,
     modifier: Modifier = Modifier
 ) {
-    Column(
-        modifier = modifier.padding(16.dp)
-    ) {
+    val followStatus by followViewModel.followStatus.collectAsState()
+    val isFollowing = followStatus[profile.userId] ?: false
+
+    Column(modifier = modifier.padding(16.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
@@ -148,9 +138,8 @@ private fun UserProfileHeader(
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold
                 )
-                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = profile.username,
+                    text = "@${profile.username}",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
@@ -158,7 +147,7 @@ private fun UserProfileHeader(
 
             AsyncImage(
                 model = profile.profileImageUrl.ifEmpty { R.drawable.person },
-                contentDescription = "Profile Image",
+                contentDescription = "Profile Picture",
                 modifier = Modifier
                     .size(80.dp)
                     .clip(CircleShape),
@@ -175,36 +164,20 @@ private fun UserProfileHeader(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                painter = painterResource(id = R.drawable.followers),
-                contentDescription = "Followers",
-                modifier = Modifier.size(24.dp)
-            )
-            Text(
-                text = "${profile.followersCount} followers",
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Bold
-            )
-        }
+        FollowStats(
+            followersCount = profile.followersCount,
+            followingCount = profile.followingCount,
+            modifier = Modifier.fillMaxWidth()
+        )
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Button(
-            onClick = onFollowClick,
+        FollowButton(
+            userId = profile.userId,
+            isFollowing = isFollowing,
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(8.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor  = Color.Black, // Set background to black
-                contentColor = Color.White // Set text color to white
-            )
-
-        ) {
-            Text("Follow")
-        }
+            followViewModel = followViewModel
+        )
     }
 }
 

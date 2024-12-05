@@ -1,6 +1,9 @@
 package com.example.myapplication.screens
 
 import android.util.Log
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -19,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -29,6 +33,7 @@ import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -47,16 +52,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.example.myapplication.AuthViewModel
 import com.example.myapplication.PostViewModel
 import com.example.myapplication.R
 import com.example.myapplication.components.CustomIcon
@@ -66,76 +74,126 @@ import com.example.myapplication.models.NotificationType
 import com.example.myapplication.models.Post
 import com.example.myapplication.navigation.Routes
 import com.example.myapplication.ui.theme.AppColors
+import com.example.myapplication.ui.theme.InterFontFamily
 import com.example.myapplication.utils.toRelativeTimeString
 import com.example.myapplication.viewmodels.NotificationViewModel
 import kotlinx.coroutines.delay
 
 //@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Home(
     navController: NavController,
+    authViewModel: AuthViewModel,
     postViewModel: PostViewModel = viewModel()
 ) {
     val posts by postViewModel.posts.collectAsState()
     var isLoading by remember { mutableStateOf(true) }
+    val listState = rememberLazyListState()
+    var isFabPressed by remember { mutableStateOf(false) }
 
-    // Fetch posts when the composable is launched
+    // Animation values for FAB
+    val scale by animateFloatAsState(
+        targetValue = if (isFabPressed) 0.8f else 1f,
+        animationSpec = spring(
+            dampingRatio = 0.4f,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = ""
+    )
+
     LaunchedEffect(Unit) {
-        delay(1500) // Add 1.5s delay to show loading
+        delay(1500) // Loading simulation
         postViewModel.fetchPosts()
         isLoading = false
     }
 
-    Scaffold(
-        containerColor = AppColors.White,
-        topBar = {
-            Box(
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            containerColor = AppColors.White,
+            topBar = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(id = R.drawable.logo),
+                        contentDescription = "App Logo",
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
+            }
+        ) { innerPadding ->
+            LazyColumn(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 12.dp),
-                contentAlignment = Alignment.Center
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                state = listState,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.logo),
-                    contentDescription = "App Logo",
-                    modifier = Modifier.size(40.dp)
-                )
+                if (isLoading) {
+                    items(9) {
+                        ShimmerListItem()
+                        HorizontalDivider(
+                            thickness = 1.dp,
+                            color = AppColors.Divider
+                        )
+                    }
+                } else {
+                    items(posts) { post ->
+                        PostItem(
+                            post = post,
+                            postViewModel = postViewModel,
+                            navController = navController
+                        )
+                        HorizontalDivider(
+                            thickness = 1.dp,
+                            color = AppColors.Divider
+                        )
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(64.dp))
+                }
             }
         }
-    ) { innerPadding ->
-        LazyColumn(
+
+        // Floating Action Button
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                .align(Alignment.BottomEnd)
+                .padding(24.dp)
+                .scale(scale)
+                .clip(CircleShape)
+                .clickable {
+                    isFabPressed = true
+                    // Add small delay before navigation
+                    navController.navigate(Routes.NEW_POST)
+                }
+//                .background(Color.Black)
+                .size(55.dp),
+            contentAlignment = Alignment.Center
         ) {
-            if (isLoading) {
-                // Show shimmer effect while loading
-                items(8) {
-                    ShimmerListItem() // Replace with your shimmer composable
-                    HorizontalDivider(
-                        thickness = 1.dp,
-                        color = AppColors.Divider
-                    )
-                }
-            } else {
-                // Display posts once loaded
-                items(posts) { post ->
-                    PostItem(
-                        post = post,
-                        postViewModel = postViewModel,
-                        navController = navController
-                    )
-                    HorizontalDivider(
-                        thickness = 1.dp,
-                        color = AppColors.Divider
-                    )
-                }
-            }
+            Icon(
+                painter = painterResource(id = R.drawable.add4),
+                contentDescription = "New Post",
+                tint = Color.Black,
+                modifier = Modifier.size(70.dp)
+            )
+        }
+    }
+
+    // Reset FAB press state after animation
+    LaunchedEffect(isFabPressed) {
+        if (isFabPressed) {
+            delay(100)
+            isFabPressed = false
         }
     }
 }
-
 
 
 
@@ -204,12 +262,15 @@ fun PostItem(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp)
-            .clickable { navController.navigate(Routes.createThreadRoute(post.id)) }
+
     ) {
         Row(modifier = Modifier.fillMaxWidth()) {
             // Left column for profile picture and vertical line
             Box(
                 modifier = Modifier.width(72.dp)
+                    .clickable { // Add clickable to profile picture
+                        navController.navigate("otherUsers/${post.userId}")
+                    }
             ) {
                 // Profile picture
                 Box(
@@ -246,24 +307,35 @@ fun PostItem(
             Column(
                 modifier = Modifier
                     .weight(1f)
-                    .padding(start = 4.dp, end = 16.dp) // 8dp from profile picture, 16dp from right edge
+                    .padding(start = 4.dp, end = 16.dp)
+                    .clickable { navController.navigate(Routes.createThreadRoute(post.id)) }
             ) {
-                // Header row
+                // Username row - Keep the existing clickable on username
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+
                         Text(
                             text = post.userName,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold
+                            fontFamily = InterFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            modifier = Modifier
+                                .clickable {
+                                    navController.navigate(Routes.createOtherUserRoute(post.userId))
+                                }
+                                .padding(vertical = 4.dp)
                         )
+
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "· ${post.timestamp.toRelativeTimeString()}",
-                            style = MaterialTheme.typography.bodySmall,
+                            fontFamily = InterFontFamily,
+                            fontWeight = FontWeight.Normal,
+                            fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
                     }
@@ -282,7 +354,12 @@ fun PostItem(
                 // Post content with 4dp spacing from header
                 if (post.content.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(2.dp))
-                    Text(post.content)
+                    Text(
+                        text = post.content,
+                        fontFamily = InterFontFamily,
+                        fontWeight = FontWeight.Normal,
+                        fontSize = 16.sp
+                    )
                 }
 
                 // Media content with 8dp spacing
@@ -466,7 +543,7 @@ private fun ActionButton(
             if (iconType == CustomIconType.LIKE) {
                 Icon(
                     painter = painterResource(
-                        id = if (isActive) R.drawable.hearted else R.drawable.heart
+                        id = if (isActive) R.drawable.hearted3 else R.drawable.heart
                     ),
                     contentDescription = "Like",
                     modifier = Modifier.size(22.dp),

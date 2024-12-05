@@ -25,10 +25,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.example.myapplication.components.ShimmerListItem
 import com.example.myapplication.models.Post
 import com.example.myapplication.models.Reply
 import com.example.myapplication.navigation.Routes
-import com.example.myapplication.screens.FullScreenImageViewer
 import com.example.myapplication.screens.PostItem
 import com.example.myapplication.utils.toRelativeTimeString
 
@@ -38,7 +38,8 @@ fun PostWithReplies(
     replies: List<Reply>,
     postViewModel: PostViewModel,
     navController: NavController,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isLoading: Boolean = false
 ) {
     LazyColumn(
         modifier = modifier
@@ -46,6 +47,7 @@ fun PostWithReplies(
             .background(Color.White),
         verticalArrangement = Arrangement.spacedBy(4.dp)
     ) {
+        // Post and header
         item {
             PostItem(
                 post = post,
@@ -62,7 +64,7 @@ fun PostWithReplies(
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
             )
 
-            if (replies.isNotEmpty()) {
+            if (replies.isNotEmpty() || isLoading) {
                 Text(
                     "Replies",
                     style = MaterialTheme.typography.titleMedium,
@@ -71,14 +73,21 @@ fun PostWithReplies(
             }
         }
 
-        items(replies) { reply ->
-            ReplyItem(
-                reply = reply,
-                postViewModel = postViewModel,
-                postId = post.id,
-                navController = navController,
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
+        // Content based on loading state
+        if (isLoading) {
+            items(3) {
+                ShimmerListItem()
+            }
+        } else {
+            items(replies) { reply ->
+                ReplyItem(
+                    reply = reply,
+                    postViewModel = postViewModel,
+                    postId = post.id,
+                    navController = navController,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+            }
         }
     }
 }
@@ -217,7 +226,7 @@ fun ReplyItem(
                         modifier = Modifier.size(32.dp)
                     ) {
                         Icon(
-                            painter = painterResource(if (isLiked) R.drawable.hearted else R.drawable.heart),
+                            painter = painterResource(if (isLiked) R.drawable.hearted3 else R.drawable.heart),
                             contentDescription = "Like",
                             tint = if (isLiked) Color.Red else LocalContentColor.current,
                             modifier = Modifier.size(16.dp)

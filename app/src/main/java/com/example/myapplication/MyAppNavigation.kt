@@ -1,5 +1,10 @@
 package com.example.myapplication
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.EaseInOutCirc
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -15,12 +20,14 @@ import com.example.myapplication.screens.Home
 import com.example.myapplication.screens.Login
 import com.example.myapplication.screens.MainContainer
 import com.example.myapplication.screens.NewPost
+import com.example.myapplication.screens.OtherUsers
 import com.example.myapplication.screens.PostReplies
 import com.example.myapplication.screens.Reply
 import com.example.myapplication.screens.SearchScreen
 import com.example.myapplication.screens.Settings
 import com.example.myapplication.screens.SignUp
 import com.example.myapplication.screens.Thread
+import com.example.myapplication.transitions.CustomTransitions
 
 @Composable
 fun MyAppNavigation(authViewModel: AuthViewModel) {
@@ -65,6 +72,7 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
         composable(Routes.HOME) {
             Home(
                 navController = navController,
+                authViewModel = authViewModel,
                 postViewModel = postViewModel
             )
         }
@@ -77,7 +85,53 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
             SearchScreen(navController = navController, authViewModel = authViewModel)
         }
 
-        composable(Routes.NEW_POST) {
+        composable(
+            route = Routes.NEW_POST,
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                    animationSpec = tween(
+                        durationMillis = 400,
+                        easing = EaseInOutCirc
+                    )
+                ) + fadeIn(
+                    animationSpec = tween(400)
+                )
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(
+                        durationMillis = 400,
+                        easing = EaseInOutCirc
+                    )
+                ) + fadeOut(
+                    animationSpec = tween(400)
+                )
+            },
+            popEnterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                    animationSpec = tween(
+                        durationMillis = 400,
+                        easing = EaseInOutCirc
+                    )
+                ) + fadeIn(
+                    animationSpec = tween(400)
+                )
+            },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(
+                        durationMillis = 400,
+                        easing = EaseInOutCirc
+                    )
+                ) + fadeOut(
+                    animationSpec = tween(400)
+                )
+            }
+        ) {
             NewPost(
                 navController = navController,
                 postViewModel = postViewModel,
@@ -141,6 +195,20 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
                 navController = navController,
                 postViewModel = postViewModel,
                 postId = entry.arguments?.getString("postId") ?: ""
+            )
+        }
+
+        composable(
+            route = Routes.OTHER_USER,
+            arguments = listOf(
+                navArgument("userId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: return@composable
+            OtherUsers(
+                navController = navController,
+                parentNavController = navController,
+                userId = userId
             )
         }
     }

@@ -5,12 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.outlined.ChatBubbleOutline
-import androidx.compose.material.icons.outlined.FavoriteBorder
-import androidx.compose.material.icons.outlined.Repeat
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,6 +24,7 @@ import com.example.myapplication.components.CustomIconType
 import com.example.myapplication.models.Post
 import com.example.myapplication.models.Reply
 import com.example.myapplication.navigation.Routes
+import com.example.myapplication.ui.theme.AppColors
 import com.example.myapplication.utils.toRelativeTimeString
 
 @Composable
@@ -222,41 +217,56 @@ private fun InteractionButtons(
     isLiked: Boolean,
     onLikeClick: () -> Unit,
     onCommentClick: () -> Unit,
-    onRepostClick: () -> Unit
+    onRepostClick: () -> Unit,
+    onShareClick: () -> Unit = {}
 ) {
     Row(
-        modifier = Modifier.padding(top = 8.dp),
+        modifier = Modifier.padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onLikeClick) {
+        IconButton(onClick = onLikeClick, modifier = Modifier.size(32.dp)) {
             Icon(
-                imageVector = if (isLiked) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                painter = painterResource(id = if (isLiked) R.drawable.hearted3 else R.drawable.heart),
                 contentDescription = "Like",
-                tint = if (isLiked) Color.Red else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(22.dp),
+                tint = if (isLiked) Color.Red else MaterialTheme.colorScheme.onSurface
             )
         }
-        Text(text = "$likes")
+        Text("$likes", style = MaterialTheme.typography.bodySmall)
+
         Spacer(modifier = Modifier.width(16.dp))
 
-        IconButton(onClick = onCommentClick) {
-            Icon(
-                Icons.Outlined.ChatBubbleOutline,
-                contentDescription = "Comment",
-                modifier = Modifier.size(20.dp)
+        // Comment button with custom icon
+        IconButton(onClick = onCommentClick, modifier = Modifier.size(32.dp)) {
+            CustomIcon(
+                iconType = CustomIconType.COMMENT,
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.onSurface
             )
         }
-        Text(text = "$comments")
+        Text("$comments", style = MaterialTheme.typography.bodySmall)
+
         Spacer(modifier = Modifier.width(16.dp))
 
-        IconButton(onClick = onRepostClick) {
-            Icon(
-                imageVector = if (reposts > 0) Icons.Filled.Repeat else Icons.Outlined.Repeat,
-                contentDescription = "Repost",
-                tint = if (reposts > 0) Color.Green else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(20.dp)
+        // Repost button
+        IconButton(onClick = onRepostClick, modifier = Modifier.size(32.dp)) {
+            CustomIcon(
+                iconType = CustomIconType.REPOST,
+                modifier = Modifier.size(22.dp),
+                tint = if (reposts > 0) AppColors.Primary else MaterialTheme.colorScheme.onSurface
             )
         }
-        Text(text = "$reposts")
+        Text("$reposts", style = MaterialTheme.typography.bodySmall)
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        // Share button
+        IconButton(onClick = onShareClick, modifier = Modifier.size(32.dp)) {
+            CustomIcon(
+                iconType = CustomIconType.SHARE,
+                modifier = Modifier.size(22.dp),
+                tint = MaterialTheme.colorScheme.onSurface
+            )
+        }
     }
 }

@@ -49,6 +49,8 @@ class AuthViewModel : ViewModel() {
 
     private var userListener: ValueEventListener? = null
 
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
+
     val currentUserId: String?
         get() = auth.currentUser?.uid
 
@@ -149,8 +151,36 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+    private fun initializeNewUser(userId: String, userData: Map<String, Any>) {
+        viewModelScope.launch {
+            try {
+                firestore.runTransaction { transaction ->
+                    transaction.set(
+                        firestore.collection("users").document(userId),
+                        userData
+                    )
+                    transaction.set(
+                        firestore.collection("userStats").document(userId),
+                        hashMapOf(
+                            "followersCount" to 0,
+                            "followingCount" to 0
+                        )
+                    )
+                }.await()
+            } catch (e: Exception) {
+                Log.e("AuthViewModel", "Error initializing user: ${e.message}")
+                _authState.emit(AuthState.Error("Failed to initialize user: ${e.message}"))
+            }
+        }
+    }
+
     fun signup(
-        fullName: String, username: String, email: String, password: String, bio: String, profileImageUri: Uri?
+        fullName: String,
+        username: String,
+        email: String,
+        password: String,
+        bio: String,
+        profileImageUri: Uri?
     ) {
         viewModelScope.launch {
             if (fullName.isEmpty() || username.isEmpty() || email.isEmpty() || password.isEmpty()) {
@@ -166,8 +196,21 @@ class AuthViewModel : ViewModel() {
                     if (profileImageUri != null) {
                         imageUrl = uploadProfileImage(userId, profileImageUri)
                     }
-                    saveUserToDatabase(userId, fullName, username, email, bio, imageUrl)
-                    setupUserListener() // Set up real-time updates after signup
+
+                    // Create user data map
+                    val userData = hashMapOf(
+                        "fullName" to fullName,
+                        "username" to username,
+                        "email" to email,
+                        "bio" to bio,
+                        "profileImageUrl" to (imageUrl ?: "")
+                    )
+
+                    // Initialize user document and stats
+                    initializeNewUser(userId, userData)
+
+                    setupUserListener()
+                    _authState.emit(AuthState.Authenticated)
                 } else {
                     _authState.emit(AuthState.Error("Failed to get user ID"))
                 }
@@ -188,21 +231,48 @@ class AuthViewModel : ViewModel() {
     }
 
     private suspend fun saveUserToDatabase(
-        userId: String, fullName: String, username: String, email: String, bio: String, profileImageUrl: String?
+        userId: String,
+        fullName: String,
+        username: String,
+        email: String,
+        bio: String,
+        profileImageUrl: String?
     ) {
-        val userRef = database.getReference("users").child(userId)
-        val user = HashMap<String, Any>()
-        user["fullName"] = fullName
-        user["username"] = username
-        user["email"] = email
-        user["bio"] = bio
-        profileImageUrl?.let { user["profileImageUrl"] = it }
-
         try {
-            userRef.setValue(user).await()
+            // First save to Realtime Database
+            val realtimeDbRef = database.getReference("users").child(userId)
+            val user = hashMapOf(
+                "fullName" to fullName,
+                "username" to username,
+                "email" to email,
+                "bio" to bio,
+                "followersCount" to 0,
+                "followingCount" to 0
+            )
+            profileImageUrl?.let { user["profileImageUrl"] = it }
+            realtimeDbRef.setValue(user).await()
+
+            // Then initialize Firestore documents
+            firestore.runTransaction { transaction ->
+                // Create user document in Firestore
+                transaction.set(
+                    firestore.collection("users").document(userId),
+                    user
+                )
+                // Initialize stats document
+                transaction.set(
+                    firestore.collection("userStats").document(userId),
+                    hashMapOf(
+                        "followersCount" to 0,
+                        "followingCount" to 0
+                    )
+                )
+            }.await()
+
             _authState.emit(AuthState.Authenticated)
         } catch (e: Exception) {
             _authState.emit(AuthState.Error("Failed to save user data"))
+            throw e
         }
     }
 
@@ -266,6 +336,8 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+
+
     fun logout() {
         viewModelScope.launch {
             try {
@@ -304,6 +376,9 @@ class AuthViewModel : ViewModel() {
         }
     }
 }
+
+
+
 
 sealed class AuthState {
     data object Authenticated : AuthState()

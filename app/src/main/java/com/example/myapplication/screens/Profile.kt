@@ -27,7 +27,9 @@ import com.example.myapplication.AuthViewModel
 import com.example.myapplication.PostViewModel
 import com.example.myapplication.components.CustomIcon
 import com.example.myapplication.components.CustomIconType
+import com.example.myapplication.components.ShimmerListItem
 import com.example.myapplication.ui.theme.AppColors
+import kotlinx.coroutines.delay
 
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -52,6 +54,9 @@ fun Profile(
     val userReplies by postViewModel.userReplies.collectAsState()
     val userReposts by postViewModel.userReposts.collectAsState()
 
+    var isLoading by remember { mutableStateOf(true) }
+
+
     val listState = rememberLazyListState()
     val isScrolled by remember {
         derivedStateOf {
@@ -60,11 +65,14 @@ fun Profile(
     }
 
     LaunchedEffect(userId, selectedTab) {
+        isLoading = true
         when (selectedTab) {
             0 -> postViewModel.fetchPosts()
             1 -> postViewModel.fetchUserReplies(userId)
             2 -> postViewModel.fetchUserReposts(userId)
         }
+        delay(1500)
+        isLoading = false
     }
 
     Scaffold(
@@ -246,41 +254,67 @@ fun Profile(
 
                 // Content based on selected tab
                 when (selectedTab) {
-                    0 -> items(userPosts) { post ->
-                        PostItem(
-                            post = post,
-                            postViewModel = postViewModel,
-                            navController = parentNavController,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                        HorizontalDivider(color = AppColors.Divider)
-                    }
-                    1 -> items(userReplies) { (post, reply) ->
-                        UserReplyItem(
-                            post = post,
-                            reply = reply,
-                            postViewModel = postViewModel,
-                            navController = parentNavController,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                        HorizontalDivider(color = AppColors.Divider)
-                    }
-                    2 -> items(userReposts) { post ->
-                        if (post.isRepost) {
-                            RepostHeader(repostedByName = post.repostedByName ?: "")
+                    0 -> {
+                        if (isLoading) {
+                            items(3) {
+                                ShimmerListItem()
+                                HorizontalDivider(color = AppColors.Divider)
+                            }
+                        } else {
+                            items(userPosts) { post ->
+                                PostItem(
+                                    post = post,
+                                    postViewModel = postViewModel,
+                                    navController = parentNavController,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                                HorizontalDivider(color = AppColors.Divider)
+                            }
                         }
-                        PostItem(
-                            post = post,
-                            postViewModel = postViewModel,
-                            navController = parentNavController,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                        HorizontalDivider(color = AppColors.Divider)
                     }
-                }
+                    1 -> {
+                        if (isLoading) {
+                            items(3) {
+                                ShimmerListItem()
+                                HorizontalDivider(color = AppColors.Divider)
+                            }
+                        } else {
+                            items(userReplies) { (post, reply) ->
+                                UserReplyItem(
+                                    post = post,
+                                    reply = reply,
+                                    postViewModel = postViewModel,
+                                    navController = parentNavController,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                                HorizontalDivider(color = AppColors.Divider)
+                            }
+                        }
+                    }
+                    2 -> {
+                        if (isLoading) {
+                            items(3) {
+                                ShimmerListItem()
+                                HorizontalDivider(color = AppColors.Divider)
+                            }
+                        } else {
+                            items(userReposts) { post ->
+                                if (post.isRepost) {
+                                    RepostHeader(repostedByName = post.repostedByName ?: "")
+                                }
+                                PostItem(
+                                    post = post,
+                                    postViewModel = postViewModel,
+                                    navController = parentNavController,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                                HorizontalDivider(color = AppColors.Divider)
+                            }
+                        }
+                    }
+                }}}
+
             }
-        }
-    }
 
     if (showShareSheet) {
         ShareBottomSheet(

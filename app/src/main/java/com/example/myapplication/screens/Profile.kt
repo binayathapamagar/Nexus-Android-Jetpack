@@ -60,8 +60,11 @@ import com.example.myapplication.components.CustomIcon
 import com.example.myapplication.components.CustomIconType
 import com.example.myapplication.components.FollowStats
 import com.example.myapplication.components.ShimmerListItem
+import com.example.myapplication.navigation.Routes
 import com.example.myapplication.ui.theme.AppColors
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.tasks.await
 
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -78,7 +81,6 @@ fun Profile(
     val userName by authViewModel.userName.collectAsState()
     val userHandle by authViewModel.userHandle.collectAsState()
     val userBio by authViewModel.userBio.collectAsState()
-    val followerCount by authViewModel.followerCount.collectAsState()
     val posts by postViewModel.posts.collectAsState()
     val userPosts = posts.filter { it.userId == userId }
     val profileLink by authViewModel.profileLink.collectAsState()
@@ -87,6 +89,7 @@ fun Profile(
     val userReposts by postViewModel.userReposts.collectAsState()
 
     var isLoading by remember { mutableStateOf(true) }
+    var followersCount by remember { mutableIntStateOf(0) } // Declare followersCount here
 
 
     val listState = rememberLazyListState()
@@ -94,6 +97,17 @@ fun Profile(
         derivedStateOf {
             listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
         }
+    }
+    // Fetch followers count from Firestore
+    LaunchedEffect(userId) {
+        try {
+            val statsRef = FirebaseFirestore.getInstance().collection("userStats").document(userId)
+            val stats = statsRef.get().await()
+            followersCount = stats.getLong("followersCount")?.toInt() ?: 0
+        } catch (e: Exception) {
+            Log.e("Profile", "Error fetching followers count: ${e.message}")
+        }
+        isLoading = false
     }
 
     LaunchedEffect(userId, selectedTab) {
@@ -215,7 +229,7 @@ fun Profile(
                         Spacer(modifier = Modifier.height(16.dp))
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            followerCount?.let {
+                            followersCount.let {
                                 FollowStats(
                                     followersCount = it,
                                     modifier = Modifier.fillMaxWidth()
@@ -316,7 +330,11 @@ fun Profile(
                                     post = post,
                                     postViewModel = postViewModel,
                                     navController = parentNavController,
-                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                    modifier = Modifier
+                                        .padding(horizontal = 16.dp)
+                                        .clickable {
+                                            parentNavController.navigate(Routes.createThreadRoute(post.id))
+                                        }
                                 )
                                 HorizontalDivider(color = AppColors.Divider)
                             }

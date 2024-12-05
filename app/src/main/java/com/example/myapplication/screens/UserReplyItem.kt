@@ -123,10 +123,10 @@ fun UserReplyItem(
                     }
                     Text(text = post.content)
 
-                    if (post.imageUrls.isNotEmpty()) {
+                    if (post.imageUrl.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))
                         AsyncImage(
-                            model = post.imageUrls.first(),
+                            model = post.imageUrl.first(),
                             contentDescription = "Post Image",
                             modifier = Modifier
                                 .fillMaxWidth()

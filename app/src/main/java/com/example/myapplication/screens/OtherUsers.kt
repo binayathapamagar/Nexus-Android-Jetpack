@@ -328,25 +328,30 @@ private fun RepostsTab(
                 Column(
                     modifier = Modifier
                         .clickable {
-                            parentNavController.navigate(Routes.createThreadRoute(post.originalPostId ?: post.id))
+                            // Navigate to the original post using repostStatus if available
+                            val originalPostId = post.repostStatus?.repostId ?: post.id
+                            parentNavController.navigate(Routes.createThreadRoute(originalPostId))
                         }
                         .padding(horizontal = 16.dp)
                 ) {
-                    if (post.isRepost) {
+                    // Check if the post has a repost status and if it's a repost
+                    post.repostStatus?.takeIf { it.isReposted }?.let {
+                        // Display reposted by information if the post is a repost
                         Text(
-                            text = "${post.repostedByName ?: "User"} reposted",
+                            text = "${it.repostedByName ?: "User"} reposted",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(vertical = 8.dp)
                         )
                     }
+
+                    // PostItem will display the details of the post
                     PostItem(
                         post = post,
                         postViewModel = postViewModel,
-                        navController = parentNavController,  // Make sure to use parentNavController here
+                        navController = parentNavController,
                         modifier = Modifier
                             .padding(horizontal = 16.dp)
-                        // Remove the clickable here since it's already in the Column
                     )
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
@@ -354,6 +359,8 @@ private fun RepostsTab(
         }
     }
 }
+
+
 
 
 @Composable

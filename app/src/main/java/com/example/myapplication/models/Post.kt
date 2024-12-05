@@ -9,26 +9,14 @@ data class Post(
     val userName: String = "",
     val userProfileImageUrl: String = "",
     val content: String = "",
-    val imageUrls: List<String> = emptyList(),
     val timestamp: Date? = null,
     val likes: Int = 0,
-    val replyCount: Int = 0,
     val reposts: Int = 0,
+    val replyCount: Int = 0,
+    val imageUrl: List<String> = listOf(),
     val isLikedByCurrentUser: Boolean = false,
-    val likedBy: List<String> = emptyList(),
-    // Repost-related fields
-    val isRepost: Boolean = false,
-    val originalPostId: String? = null,
-    val repostedBy: String? = null,
-    val repostedByName: String? = null,
-    val repostTimestamp: Date? = null,
-    val isRepostedByCurrentUser: Boolean = false,
-    val repostStatus: RepostStatus = RepostStatus()
-) {
-    // Remove unused computed properties and keep only necessary ones
-    val hasImages: Boolean
-        get() = imageUrls.isNotEmpty()
-}
+    val repostStatus: RepostStatus? = null // Change from Boolean to RepostStatus
+)
 
 data class RepostStatus(
     val isReposted: Boolean = false,
@@ -45,7 +33,7 @@ data class Reply(
     val userName: String = "",
     val userProfileImageUrl: String = "",
     val content: String = "",
-    val imageUrls: List<String> = emptyList(),
+    val imageUrl: List<String> = emptyList(),
     val timestamp: Date? = null,
     val likes: Int = 0,
     val replies: Int = 0,

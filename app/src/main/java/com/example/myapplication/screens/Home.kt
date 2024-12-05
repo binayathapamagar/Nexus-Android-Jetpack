@@ -90,6 +90,7 @@ fun Home(
     val userName by authViewModel.userName.collectAsState()
     var isLoading by remember { mutableStateOf(true) }
 
+
     // Fetch posts when the composable is launched
     LaunchedEffect(Unit) {
         delay(1500) // Add 1.5s delay to show loading
@@ -225,7 +226,7 @@ fun PostItem(
     var showImageViewer by remember { mutableStateOf(false) }
     var initialPage by remember { mutableIntStateOf(0) }
     var isLiked by remember { mutableStateOf(post.isLikedByCurrentUser) }
-    var isReposted by remember { mutableStateOf(post.isRepostedByCurrentUser) }
+    var isReposted = post.repostStatus?.isReposted ?: false
     var showRepostDialog by remember { mutableStateOf(false) }
     val notificationViewModel: NotificationViewModel = viewModel()
     Column(
@@ -314,15 +315,15 @@ fun PostItem(
                 }
 
                 // Media content with 8dp spacing
-                if (post.imageUrls.isNotEmpty()) {
+                if (post.imageUrl.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    when (post.imageUrls.size) {
-                        1 -> SingleImage(post.imageUrls[0]) { showImageViewer = true }
-                        2 -> TwoImages(post.imageUrls) { index ->
+                    when (post.imageUrl.size) {
+                        1 -> SingleImage(post.imageUrl[0]) { showImageViewer = true }
+                        2 -> TwoImages(post.imageUrl) { index ->
                             initialPage = index
                             showImageViewer = true
                         }
-                        else -> MultipleImages(post.imageUrls) { index ->
+                        else -> MultipleImages(post.imageUrl) { index ->
                             initialPage = index
                             showImageViewer = true
                         }
@@ -394,6 +395,7 @@ fun PostItem(
 
                     // Repost button
                     ActionButton(
+
                         isActive = isReposted,
                         activeColor = Color(0xFF4CAF50),
                         count = post.reposts,
@@ -501,7 +503,7 @@ fun PostItem(
 
     if (showImageViewer) {
         FullScreenImageViewer(
-            imageUrls = post.imageUrls,
+            imageUrl = post.imageUrl,
             initialPage = initialPage,
             onDismiss = { showImageViewer = false }
         )
@@ -573,14 +575,14 @@ private fun SingleImage(
 
 @Composable
 private fun TwoImages(
-    imageUrls: List<String>,
+    imageUrl: List<String>,
     onImageClick: (Int) -> Unit
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        imageUrls.take(2).forEachIndexed { index, url ->
+        imageUrl.take(2).forEachIndexed { index, url ->
             AsyncImage(
                 model = url,
                 contentDescription = "Post Image",
@@ -597,7 +599,7 @@ private fun TwoImages(
 
 @Composable
 private fun MultipleImages(
-    imageUrls: List<String>,
+    imageUrl: List<String>,
     onImageClick: (Int) -> Unit
 ) {
     Column(
@@ -605,7 +607,7 @@ private fun MultipleImages(
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
         AsyncImage(
-            model = imageUrls[0],
+            model = imageUrl[0],
             contentDescription = "Post Image",
             modifier = Modifier
                 .fillMaxWidth()
@@ -618,7 +620,7 @@ private fun MultipleImages(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
-            imageUrls.drop(1).take(3).forEachIndexed { index, url ->
+            imageUrl.drop(1).take(3).forEachIndexed { index, url ->
                 AsyncImage(
                     model = url,
                     contentDescription = "Post Image",
@@ -654,11 +656,11 @@ private fun MultipleImages(
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FullScreenImageViewer(
-    imageUrls: List<String>,
+    imageUrl: List<String>,
     initialPage: Int,
     onDismiss: () -> Unit
 ) {
-    val pagerState = rememberPagerState(initialPage = initialPage) { imageUrls.size }
+    val pagerState = rememberPagerState(initialPage = initialPage) { imageUrl.size }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -678,7 +680,7 @@ fun FullScreenImageViewer(
                 state = pagerState
             ) { page ->
                 AsyncImage(
-                    model = imageUrls[page],
+                    model = imageUrl[page],
                     contentDescription = "Full-screen Image",
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit
@@ -706,7 +708,7 @@ fun FullScreenImageViewer(
                     .padding(16.dp)
             ) {
                 Text(
-                    text = "${pagerState.currentPage + 1} / ${imageUrls.size}",
+                    text = "${pagerState.currentPage + 1} / ${imageUrl.size}",
                     color = Color.White
                 )
             }

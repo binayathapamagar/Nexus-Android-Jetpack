@@ -1,5 +1,6 @@
 package com.example.myapplication.screens
 
+import ProfileAvatar
 import android.util.Log
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -77,6 +78,7 @@ import com.example.myapplication.ui.theme.AppColors
 import com.example.myapplication.ui.theme.InterFontFamily
 import com.example.myapplication.utils.toRelativeTimeString
 import com.example.myapplication.viewmodels.NotificationViewModel
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.delay
 
 //@OptIn(ExperimentalMaterial3Api::class)
@@ -277,15 +279,13 @@ fun PostItem(
                     modifier = Modifier
                         .padding(start = 12.dp)
                 ) {
-                    AsyncImage(
-                        model = post.userProfileImageUrl,
-                        contentDescription = "Profile Picture",
-                        modifier = Modifier
-//                            .padding(start = 3.dp) // Single padding from the left edge
-                            .size(48.dp) // Standard size used by Threads/Twitter
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop,
-                        error = painterResource(id = R.drawable.person)
+                    ProfileAvatar(
+                        imageUrl = post.userProfileImageUrl,
+                        showFollowButton = post.userId != FirebaseAuth.getInstance().currentUser?.uid,
+                        onFollowClick = {
+                            // Follow functionality will be added later
+                        },
+                        size = 48
                     )
                 }
 

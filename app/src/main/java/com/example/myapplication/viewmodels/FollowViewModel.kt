@@ -3,7 +3,13 @@ package com.example.myapplication.viewmodels
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.myapplication.models.NotificationType
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.MutableData
+import com.google.firebase.database.Transaction
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -73,10 +79,6 @@ class FollowViewModel : ViewModel() {
                 _isLoading.value = true
                 val currentUser = auth.currentUser ?: return@launch
 
-                // Ensure both users have stats documents
-                ensureUserStatsExists(currentUser.uid)
-                ensureUserStatsExists(targetUserId)
-
                 val isCurrentlyFollowing = _followStatus.value[targetUserId] ?: false
 
                 if (isCurrentlyFollowing) {
@@ -84,9 +86,15 @@ class FollowViewModel : ViewModel() {
                 } else {
                     followUser(currentUser.uid, targetUserId)
                 }
+
+                // Update local state immediately for better UX
+                _followStatus.value = _followStatus.value + (targetUserId to !isCurrentlyFollowing)
+
             } catch (e: Exception) {
                 Log.e("FollowViewModel", "Toggle follow error: ${e.message}")
-                _error.value = e.message
+                // Revert local state if operation failed
+                _followStatus.value = _followStatus.value - targetUserId
+                _error.value = "Failed to update follow status"
             } finally {
                 _isLoading.value = false
             }
@@ -95,7 +103,10 @@ class FollowViewModel : ViewModel() {
 
     private suspend fun followUser(currentUserId: String, targetUserId: String) {
         try {
-            // Get user profiles for notification
+            // Ensure both users have stats documents
+            ensureUserStatsExists(currentUserId)
+            ensureUserStatsExists(targetUserId)
+
             val batch = firestore.batch()
 
             // Create following relationship
@@ -108,7 +119,6 @@ class FollowViewModel : ViewModel() {
                 "timestamp" to FieldValue.serverTimestamp()
             )
 
-            // Set following document
             batch.set(followingRef, followData)
 
             // Update follower counts
@@ -118,8 +128,39 @@ class FollowViewModel : ViewModel() {
             val currentStatsRef = firestore.collection("userStats").document(currentUserId)
             batch.update(currentStatsRef, "followingCount", FieldValue.increment(1))
 
-            // Commit the batch
             batch.commit().await()
+
+            // Update follower count in Realtime Database
+            val realtimeDb = FirebaseDatabase.getInstance()
+            realtimeDb.getReference("users")
+                .child(targetUserId)
+                .child("followerCount")
+                .runTransaction(object : Transaction.Handler {
+                    override fun doTransaction(mutableData: MutableData): Transaction.Result {
+                        val currentCount = mutableData.getValue(Int::class.java) ?: 0
+                        mutableData.value = currentCount + 1
+                        return Transaction.success(mutableData)
+                    }
+
+                    override fun onComplete(
+                        error: DatabaseError?,
+                        committed: Boolean,
+                        currentData: DataSnapshot?
+                    ) {
+                        if (error != null) {
+                            Log.e("FollowViewModel", "Error updating follower count: ${error.message}")
+                        }
+                    }
+                })
+
+            // Create follow notification
+            val notificationViewModel = NotificationViewModel()
+            notificationViewModel.saveNotification(
+                recipientID = targetUserId,
+                actionType = NotificationType.FOLLOW,
+                postId = "",
+                postContent = ""
+            )
 
             // Update local state
             _followStatus.value = _followStatus.value + (targetUserId to true)

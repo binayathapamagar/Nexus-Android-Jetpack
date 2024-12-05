@@ -20,6 +20,7 @@ import com.example.myapplication.AuthViewModel
 import com.example.myapplication.PostViewModel
 import com.example.myapplication.components.AnimatedNavigationBar
 import com.example.myapplication.ui.theme.AppColors
+import com.example.myapplication.viewmodels.FollowViewModel
 import com.example.myapplication.viewmodels.NotificationViewModel
 
 @Composable
@@ -35,6 +36,7 @@ fun MainContainer(
     val notificationViewModel: NotificationViewModel = viewModel()
     val hasNewNotifications by notificationViewModel.hasNewNotifications.collectAsState()
     val listState = rememberLazyListState()
+    val followViewModel: FollowViewModel = viewModel()
 
     LaunchedEffect(authViewModel.currentUserId) {
         authViewModel.currentUserId?.let {
@@ -78,7 +80,8 @@ fun MainContainer(
             composable("activity") {
                 Activity(
                     navController = navController,
-                    notificationViewModel = notificationViewModel
+                    notificationViewModel = notificationViewModel,
+                    followViewModel = followViewModel
                 )
                 LaunchedEffect(Unit) {
                     notificationViewModel.markAllNotificationsAsRead()

@@ -23,7 +23,7 @@ import com.example.myapplication.navigation.Routes
 @Composable
 fun AnimatedNavigationBar(
     navController: NavController,
-    parentNavController: NavController, // Add this parameter
+    parentNavController: NavController,
     listState: LazyListState,
     notificationViewModel: NotificationViewModel,
     hasNewNotifications: Boolean,
@@ -40,6 +40,8 @@ fun AnimatedNavigationBar(
         label = "navBarOffset"
     )
 
+    val currentRoute = navController.currentDestination?.route
+
     NavigationBar(
         modifier = modifier
             .fillMaxWidth()
@@ -49,18 +51,20 @@ fun AnimatedNavigationBar(
         tonalElevation = 0.dp
     ) {
         listOf(
-            Pair("home", CustomIconType.HOME),
-            Pair("search", CustomIconType.SEARCH),
+            Pair("home", if (currentRoute == "home") CustomIconType.HOME else CustomIconType.HOME2),
+            Pair("search", if (currentRoute == "search") CustomIconType.SEARCH_ON else CustomIconType.SEARCH),
             Pair("newPost", CustomIconType.ADD),
             Pair(
                 "activity",
-                if (hasNewNotifications) CustomIconType.NOTIFICATION else CustomIconType.NOTIFICATION_INACTIVE
+                if (currentRoute == "activity") CustomIconType.NOTIFICATION_ON
+                else if (hasNewNotifications) CustomIconType.NOTIFICATION
+                else CustomIconType.NOTIFICATION_INACTIVE
             ),
-            Pair("profile", CustomIconType.PROFILE)
+            Pair("profile", if (currentRoute == "profile") CustomIconType.PROFILE_ON else CustomIconType.PROFILE)
         ).forEach { (route, icon) ->
             NavigationBarItem(
                 icon = { CustomIcon(icon, modifier = Modifier.size(24.dp)) },
-                selected = navController.currentDestination?.route == route,
+                selected = currentRoute == route,
                 onClick = {
                     when (route) {
                         "newPost" -> {
@@ -69,7 +73,7 @@ fun AnimatedNavigationBar(
                             }
                         }
                         else -> {
-                            if (navController.currentDestination?.route != route) {
+                            if (currentRoute != route) {
                                 navController.navigate(route) {
                                     popUpTo(navController.graph.startDestinationId) {
                                         saveState = true

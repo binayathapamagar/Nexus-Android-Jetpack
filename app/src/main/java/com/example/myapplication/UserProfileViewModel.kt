@@ -12,6 +12,7 @@ import com.example.myapplication.models.UserProfile
 import com.google.firebase.database.FirebaseDatabase
 
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,16 +35,21 @@ class UserProfileViewModel : ViewModel() {
     private val _reposts = MutableStateFlow<List<Repost>>(emptyList())
     val reposts: StateFlow<List<Repost>> = _reposts
 
+    private var userStatsListener: ListenerRegistration? = null
+
     fun fetchUserData(userId: String) {
         viewModelScope.launch {
             try {
                 isLoading.value = true
-
+                ensureUserStatsExist(userId)
                 // Fetch user data from Realtime Database
                 val userSnapshot = database.getReference("users")
                     .child(userId)
                     .get()
                     .await()
+
+                // Set up real-time listener for user stats
+                setupUserStatsListener(userId)
 
                 // Fetch user stats from Firestore
                 val statsDoc = firestore.collection("userStats")
@@ -76,51 +82,107 @@ class UserProfileViewModel : ViewModel() {
         }
     }
 
+    private fun setupUserStatsListener(userId: String) {
+        // Remove any existing listener
+        userStatsListener?.remove()
+
+        // Set up new listener
+        userStatsListener = firestore.collection("userStats")
+            .document(userId)
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    Log.e("UserProfileViewModel", "Error listening to user stats: ${e.message}")
+                    return@addSnapshotListener
+                }
+
+                snapshot?.let { doc ->
+                    val followersCount = doc.getLong("followersCount")?.toInt() ?: 0
+                    val followingCount = doc.getLong("followingCount")?.toInt() ?: 0
+
+                    _userProfile.value = _userProfile.value?.copy(
+                        followersCount = followersCount,
+                        followingCount = followingCount
+                    )
+                }
+            }}
+
+    private suspend fun ensureUserStatsExist(userId: String) {
+        try {
+            val statsRef = firestore.collection("userStats").document(userId)
+            val stats = statsRef.get().await()
+
+            if (!stats.exists()) {
+                statsRef.set(
+                    hashMapOf(
+                        "followersCount" to 0,
+                        "followingCount" to 0
+                    )
+                ).await()
+            }
+        } catch (e: Exception) {
+            Log.e("UserProfileViewModel", "Error ensuring user stats: ${e.message}")
+        }
+    }
+
     private suspend fun loadUserContent(userId: String) {
         try {
             // Fetch posts
             val postsSnapshot = firestore.collection("posts")
                 .whereEqualTo("userId", userId)
                 .orderBy("timestamp", Query.Direction.DESCENDING)
+                .limit(20)
                 .get()
                 .await()
 
             val userPosts = postsSnapshot.documents.mapNotNull { doc ->
-                doc.toObject(Post::class.java)?.copy(id = doc.id)
+                try {
+                    doc.toObject(Post::class.java)?.copy(id = doc.id)
+                } catch (e: Exception) {
+                    Log.e("UserProfileViewModel", "Error parsing post: ${e.message}")
+                    null
+                }
             }
             _posts.value = userPosts
 
-            // Fetch replies
-            val allPosts = firestore.collection("posts").get().await()
-            val userReplies = mutableListOf<Reply>()
+            // Add these functions to handle replies and reposts
+            suspend fun fetchUserReplies(userId: String) {
+                val allPosts = firestore.collection("posts").get().await()
+                val userReplies = mutableListOf<Reply>()
 
-            allPosts.documents.forEach { postDoc ->
-                val repliesSnapshot = postDoc.reference.collection("comments")
-                    .whereEqualTo("userId", userId)
+                allPosts.documents.forEach { postDoc ->
+                    val repliesSnapshot = postDoc.reference.collection("comments")
+                        .whereEqualTo("userId", userId)
+                        .get()
+                        .await()
+
+                    repliesSnapshot.documents.forEach { replyDoc ->
+                        replyDoc.toObject(Reply::class.java)?.let {
+                            userReplies.add(it.copy(id = replyDoc.id))
+                        }
+                    }
+                }
+                _replies.value = userReplies
+            }
+
+
+            suspend fun fetchUserReposts(userId: String) {
+                val repostsSnapshot = firestore.collection("reposts")
+                    .whereEqualTo("repostedByUserId", userId)
                     .get()
                     .await()
 
-                repliesSnapshot.documents.forEach { replyDoc ->
-                    replyDoc.toObject(Reply::class.java)?.let {
-                        userReplies.add(it.copy(id = replyDoc.id))
-                    }
+                val userReposts = repostsSnapshot.documents.mapNotNull { doc ->
+                    doc.toObject(Repost::class.java)?.copy(id = doc.id)
                 }
+                _reposts.value = userReposts
             }
-            _replies.value = userReplies
 
-            // Fetch reposts
-            val repostsSnapshot = firestore.collection("reposts")
-                .whereEqualTo("repostedByUserId", userId)
-                .get()
-                .await()
-
-            val userReposts = repostsSnapshot.documents.mapNotNull { doc ->
-                doc.toObject(Repost::class.java)?.copy(id = doc.id)
-            }
-            _reposts.value = userReposts
+            // Call the functions
+            fetchUserReplies(userId)
+            fetchUserReposts(userId)
 
         } catch (e: Exception) {
-            Log.e("UserProfileViewModel", "Error loading user content: ${e.message}")
+            Log.e("UserProfileViewModel", "Error in loadUserContent: ${e.message}")
         }
     }
 
@@ -143,5 +205,9 @@ class UserProfileViewModel : ViewModel() {
                 Log.e("UserProfileViewModel", "Error refreshing stats: ${e.message}")
             }
         }
+    }
+    override fun onCleared() {
+        super.onCleared()
+        userStatsListener?.remove()
     }
 }

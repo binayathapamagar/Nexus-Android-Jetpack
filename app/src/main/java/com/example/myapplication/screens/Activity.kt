@@ -1,6 +1,5 @@
 package com.example.myapplication.screens
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,11 +23,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.outlined.ChatBubble
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -35,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -56,6 +58,7 @@ import com.example.myapplication.models.Notification
 import com.example.myapplication.models.NotificationType
 import com.example.myapplication.ui.theme.AppColors
 import com.example.myapplication.utils.toRelativeTimeString
+import com.example.myapplication.viewmodels.FollowViewModel
 import com.example.myapplication.viewmodels.NotificationViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -63,11 +66,16 @@ import com.example.myapplication.viewmodels.NotificationViewModel
 fun Activity(
     modifier: Modifier = Modifier,
     notificationViewModel: NotificationViewModel = viewModel(),
+    followViewModel: FollowViewModel = viewModel(),
     navController: NavHostController
 ) {
     val notifications by notificationViewModel.notifications.collectAsState()
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("All", "Follows", "Replies", "Reposts", "Mentions")
+
+    LaunchedEffect(Unit) {
+        notificationViewModel.startListeningForNotifications()
+    }
 
     Column(
         modifier = modifier
@@ -86,13 +94,13 @@ fun Activity(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             contentPadding = PaddingValues(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp) // Space between tabs
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(tabs.size) { index ->
                 val isSelected = selectedTab == index
                 Box(
                     modifier = Modifier
-                        .size(width = 112.dp, height = 42.dp) // Set fixed size
+                        .size(width = 112.dp, height = 42.dp)
                         .clip(MaterialTheme.shapes.medium)
                         .background(
                             if (isSelected) AppColors.Black else AppColors.White
@@ -103,7 +111,7 @@ fun Activity(
                             shape = MaterialTheme.shapes.medium
                         )
                         .clickable { selectedTab = index }
-                        .padding(vertical = 12.dp, horizontal = 16.dp), // Adjust padding for better width
+                        .padding(vertical = 12.dp, horizontal = 16.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
@@ -116,10 +124,9 @@ fun Activity(
             }
         }
 
-
         if (notifications.isEmpty()) {
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -129,18 +136,19 @@ fun Activity(
             }
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(vertical = 8.dp)
+                modifier = Modifier.weight(1f)
             ) {
-                items(notifications.filter { notification ->
-                    when (selectedTab) {
-                        1 -> notification.type == NotificationType.FOLLOW
-                        2 -> notification.type == NotificationType.COMMENT
-                        3 -> notification.type == NotificationType.REPOST
-                        4 -> notification.type == NotificationType.MENTION
-                        else -> true
+                items(
+                    notifications.filter { notification ->
+                        when (selectedTab) {
+                            1 -> notification.type == NotificationType.FOLLOW
+                            2 -> notification.type == NotificationType.COMMENT
+                            3 -> notification.type == NotificationType.REPOST
+                            4 -> notification.type == NotificationType.MENTION
+                            else -> true
+                        }
                     }
-                }) { notification ->
+                ) { notification ->
                     NotificationItem(
                         notification = notification,
                         onMarkAsRead = { notificationViewModel.markAsRead(notification.id) },
@@ -148,7 +156,8 @@ fun Activity(
                             notification.postId?.let { postId ->
                                 navController.navigate("thread/$postId")
                             }
-                        }
+                        },
+                        followViewModel = followViewModel
                     )
 
                     HorizontalDivider(
@@ -169,8 +178,12 @@ fun Activity(
 fun NotificationItem(
     notification: Notification,
     onMarkAsRead: () -> Unit,
-    onNotificationClick: () -> Unit
+    onNotificationClick: () -> Unit,
+    followViewModel: FollowViewModel // Add FollowViewModel parameter
 ) {
+    val followStatus by followViewModel.followStatus.collectAsState()
+    val isFollowing = followStatus[notification.senderId] ?: false
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -179,7 +192,7 @@ fun NotificationItem(
                     MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)
                 else Color.Transparent
             )
-            .clickable(onClick = onNotificationClick) // Make entire notification clickable
+            .clickable(onClick = onNotificationClick)
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -236,31 +249,52 @@ fun NotificationItem(
             )
         }
 
-        // Add ripple effect for better touch feedback
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .clip(CircleShape)
-        ) {
-            Icon(
-                imageVector = when (notification.type) {
-                    NotificationType.LIKE -> Icons.Filled.Favorite
-                    NotificationType.COMMENT -> Icons.Outlined.ChatBubble
-                    NotificationType.FOLLOW -> Icons.Filled.PersonAdd
-                    NotificationType.MENTION -> Icons.Filled.AlternateEmail
-                    NotificationType.REPOST -> Icons.Filled.Repeat
-                    NotificationType.REPLY -> Icons.Outlined.ChatBubbleOutline
-                },
-                contentDescription = null,
-                tint = when (notification.type) {
-                    NotificationType.LIKE -> Color.Red
-                    NotificationType.FOLLOW -> Color.Green
-                    else -> MaterialTheme.colorScheme.primary
-                },
-                modifier = Modifier.size(24.dp)
-            )
+        // Add Follow Back button for follow notifications
+        if (notification.type == NotificationType.FOLLOW && !isFollowing) {
+            Button(
+                onClick = { followViewModel.toggleFollow(notification.senderId) },
+                modifier = Modifier
+                    .height(36.dp)
+                    .padding(start = 8.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AppColors.Black,
+                    contentColor = AppColors.White
+                )
+            ) {
+                Text(
+                    text = "Follow back",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+        } else {
+            // Show notification type icon for non-follow notifications or if already following
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+            ) {
+                Icon(
+                    imageVector = when (notification.type) {
+                        NotificationType.LIKE -> Icons.Filled.Favorite
+                        NotificationType.COMMENT -> Icons.Outlined.ChatBubble
+                        NotificationType.FOLLOW -> Icons.Filled.PersonAdd
+                        NotificationType.MENTION -> Icons.Filled.AlternateEmail
+                        NotificationType.REPOST -> Icons.Filled.Repeat
+                        NotificationType.REPLY -> Icons.Outlined.ChatBubbleOutline
+                    },
+                    contentDescription = null,
+                    tint = when (notification.type) {
+                        NotificationType.LIKE -> Color.Red
+                        NotificationType.FOLLOW -> Color.Green
+                        else -> MaterialTheme.colorScheme.primary
+                    },
+                    modifier = Modifier.size(24.dp)
+                )
+            }
         }
 
+        // Mark as read button
         if (!notification.read) {
             Spacer(modifier = Modifier.width(8.dp))
             IconButton(
@@ -277,24 +311,4 @@ fun NotificationItem(
     }
 }
 
-@Composable
-fun AnimatedNotificationIcon(hasNewNotifications: Boolean) {
-    Box {
-        Icon(
-            imageVector = Icons.Default.Notifications,
-            contentDescription = "Activity"
-        )
-        if (hasNewNotifications) {
-            Canvas(
-                modifier = Modifier
-                    .size(8.dp)
-                    .align(Alignment.TopEnd)
-            ) {
-                drawCircle(
-                    color = Color.Red,
-                    radius = size.minDimension / 2
-                )
-            }
-        }
-    }
-}
+

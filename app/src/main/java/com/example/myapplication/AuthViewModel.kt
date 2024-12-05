@@ -17,6 +17,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import com.example.myapplication.models.User
+import com.google.firebase.database.MutableData
+import com.google.firebase.database.Transaction
 
 class AuthViewModel : ViewModel() {
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
@@ -220,6 +222,8 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+
+
     private suspend fun uploadProfileImage(userId: String, imageUri: Uri): String? {
         return try {
             val ref = storage.reference.child("profile_images/$userId/profile.jpg")
@@ -336,7 +340,33 @@ class AuthViewModel : ViewModel() {
         }
     }
 
+    fun updateFollowerCount(userId: String, increment: Boolean) {
+        viewModelScope.launch {
+            try {
+                val userRef = database.getReference("users").child(userId)
+                userRef.runTransaction(object : Transaction.Handler {
+                    override fun doTransaction(mutableData: MutableData): Transaction.Result {
+                        val currentCount = mutableData.child("followerCount").getValue(Int::class.java) ?: 0
+                        val newCount = if (increment) currentCount + 1 else currentCount - 1
+                        mutableData.child("followerCount").value = newCount.coerceAtLeast(0)
+                        return Transaction.success(mutableData)
+                    }
 
+                    override fun onComplete(
+                        error: DatabaseError?,
+                        committed: Boolean,
+                        currentData: DataSnapshot?
+                    ) {
+                        if (error != null) {
+                            Log.e("AuthViewModel", "Error updating follower count: ${error.message}")
+                        }
+                    }
+                })
+            } catch (e: Exception) {
+                Log.e("AuthViewModel", "Error updating follower count: ${e.message}")
+            }
+        }
+    }
 
     fun logout() {
         viewModelScope.launch {
@@ -354,6 +384,8 @@ class AuthViewModel : ViewModel() {
             }
         }
     }
+
+
 
     private fun clearUserDataAsync() {
         viewModelScope.launch {

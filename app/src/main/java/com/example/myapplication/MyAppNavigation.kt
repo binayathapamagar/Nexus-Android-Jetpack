@@ -16,6 +16,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.myapplication.navigation.Routes
+import com.example.myapplication.screens.EditProfile
 import com.example.myapplication.screens.Home
 import com.example.myapplication.screens.Login
 import com.example.myapplication.screens.MainContainer
@@ -209,6 +210,20 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
                 navController = navController,
                 parentNavController = navController,
                 userId = userId
+            )
+        }
+
+        composable(Routes.EDIT_PROFILE) {
+            EditProfile(
+                navController = navController,
+                authViewModel = authViewModel
+            )
+        }
+
+        composable(Routes.SETTINGS) {
+            Settings(
+                navController = navController,
+                authViewModel = authViewModel
             )
         }
     }

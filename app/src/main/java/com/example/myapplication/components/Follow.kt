@@ -19,9 +19,43 @@ fun FollowButton(
     followViewModel: FollowViewModel
 ) {
     val isLoading by followViewModel.isLoading.collectAsState()
+    var showUnfollowDialog by remember { mutableStateOf(false) }
+
+    // Unfollow confirmation dialog
+    if (showUnfollowDialog) {
+        AlertDialog(
+            onDismissRequest = { showUnfollowDialog = false },
+            title = { Text("Unfollow") },
+            text = { Text("Are you sure you want to unfollow this user?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        followViewModel.toggleFollow(userId)
+                        showUnfollowDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Unfollow")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUnfollowDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
 
     Button(
-        onClick = { followViewModel.toggleFollow(userId) },
+        onClick = {
+            if (isFollowing) {
+                showUnfollowDialog = true
+            } else {
+                followViewModel.toggleFollow(userId)
+            }
+        },
         modifier = modifier,
         enabled = !isLoading,
         colors = ButtonDefaults.buttonColors(

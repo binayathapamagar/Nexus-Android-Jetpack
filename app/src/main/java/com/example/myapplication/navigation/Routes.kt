@@ -12,6 +12,7 @@ object Routes {
     const val POST_REPLIES = "post_replies/{postId}"
     const val THREAD = "thread/{postId}"
     const val OTHER_USER = "otherUsers/{userId}"
+    const val EDIT_PROFILE = "edit_profile"
 
 
     fun createReplyRoute(

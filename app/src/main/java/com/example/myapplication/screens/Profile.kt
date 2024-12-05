@@ -2,6 +2,7 @@ package com.example.myapplication.screens
 
 import android.content.Intent
 import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -89,7 +90,15 @@ fun Profile(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { navController.navigate("settings") }) {
+                    IconButton(
+                        onClick = {
+                            try {
+                                parentNavController.navigate("settings")
+                            } catch (e: Exception) {
+                                Log.e("Profile", "Error navigating to settings: ${e.message}")
+                            }
+                        }
+                    ) {
                         CustomIcon(
                             iconType = CustomIconType.MENU,
                             modifier = Modifier.size(24.dp)
@@ -189,13 +198,22 @@ fun Profile(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             OutlinedButton(
-                                onClick = { navController.navigate("edit_profile") },
+                                onClick = {
+                                    try {
+                                        parentNavController.navigate("EDIT_PROFILE") {
+                                            launchSingleTop = true
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("Profile", "Error navigating to edit profile: ${e.message}")
+                                    }
+                                },
                                 modifier = Modifier.weight(1f),
                                 border = BorderStroke(1.dp, AppColors.Border),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text("Edit profile", color = AppColors.TextPrimary)
                             }
+
                             OutlinedButton(
                                 onClick = { showShareSheet = true },
                                 modifier = Modifier.weight(1f),

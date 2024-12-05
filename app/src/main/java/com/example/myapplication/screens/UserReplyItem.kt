@@ -1,5 +1,6 @@
 package com.example.myapplication.screens
 
+import ProfileAvatar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -26,6 +27,7 @@ import com.example.myapplication.models.Reply
 import com.example.myapplication.navigation.Routes
 import com.example.myapplication.ui.theme.AppColors
 import com.example.myapplication.utils.toRelativeTimeString
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun UserReplyItem(
@@ -65,14 +67,13 @@ fun UserReplyItem(
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    AsyncImage(
-                        model = post.userProfileImageUrl,
-                        contentDescription = "Profile Picture",
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop,
-                        error = painterResource(id = R.drawable.person)
+                    ProfileAvatar(
+                        imageUrl = reply.userProfileImageUrl,
+                        showFollowButton = reply.userId != FirebaseAuth.getInstance().currentUser?.uid,
+                        onFollowClick = {
+                            // Follow functionality will be added later
+                        },
+                        size = 40
                     )
                 }
             }

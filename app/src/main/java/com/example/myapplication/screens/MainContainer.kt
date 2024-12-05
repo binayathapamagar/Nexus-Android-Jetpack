@@ -12,13 +12,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.example.myapplication.AuthViewModel
 import com.example.myapplication.PostViewModel
 import com.example.myapplication.components.AnimatedNavigationBar
+import com.example.myapplication.navigation.Routes
 import com.example.myapplication.ui.theme.AppColors
 import com.example.myapplication.viewmodels.FollowViewModel
 import com.example.myapplication.viewmodels.NotificationViewModel
@@ -74,7 +77,9 @@ fun MainContainer(
             composable("search") {
                 SearchScreen(
                     navController = navController,
-                    authViewModel = authViewModel
+                    authViewModel = authViewModel,
+                    modifier = Modifier,
+                    followViewModel = FollowViewModel()
                 )
             }
             composable("activity") {
@@ -96,6 +101,28 @@ fun MainContainer(
                     userId = authViewModel.currentUserId ?: ""
                 )
             }
+            composable(
+                route = Routes.OTHER_USER,
+                arguments = listOf(
+                    navArgument("userId") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val userId = backStackEntry.arguments?.getString("userId") ?: return@composable
+                OtherUsers(
+                    navController = navController,
+                    parentNavController = navController,
+                    userId = userId
+                )
+            }
+            composable("thread/{postId}") { backStackEntry ->
+                val postId = backStackEntry.arguments?.getString("postId") ?: ""
+                Thread(
+                    navController = navController,
+                    postViewModel = parentPostViewModel,
+                    postId
+                )
+            }
+
         }
     }
 }

@@ -55,6 +55,7 @@ import com.example.myapplication.models.UserProfile
 import com.example.myapplication.navigation.Routes
 import com.example.myapplication.ui.theme.AppColors
 import com.example.myapplication.viewmodels.FollowViewModel
+import com.example.myapplication.viewmodels.NotificationViewModel
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -166,7 +167,6 @@ fun UserProfileHeader(
 
         FollowStats(
             followersCount = profile.followersCount,
-            followingCount = profile.followingCount,
             modifier = Modifier.fillMaxWidth()
         )
 
@@ -176,7 +176,8 @@ fun UserProfileHeader(
             userId = profile.userId,
             isFollowing = isFollowing,
             modifier = Modifier.fillMaxWidth(),
-            followViewModel = followViewModel
+            followViewModel = followViewModel,
+            notificationViewModel = NotificationViewModel()
         )
     }
 }

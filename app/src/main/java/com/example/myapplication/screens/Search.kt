@@ -2,7 +2,6 @@ package com.example.myapplication.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,9 +21,6 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -54,45 +50,63 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.example.myapplication.AuthViewModel
 import com.example.myapplication.R
+import com.example.myapplication.components.FollowButton
 import com.example.myapplication.models.User
+import com.example.myapplication.viewmodels.FollowViewModel
+import com.example.myapplication.viewmodels.NotificationViewModel
 import com.google.firebase.auth.FirebaseAuth
 
 
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
-fun SearchScreen(modifier: Modifier = Modifier, navController: NavController, authViewModel: AuthViewModel) {
+fun SearchScreen(
+    modifier: Modifier = Modifier,
+    navController: NavController,
+    authViewModel: AuthViewModel,
+    followViewModel: FollowViewModel
+) {
+    // Mutable state for the search query
     var searchQuery by remember { mutableStateOf("") }
 
     // Fetch users from AuthViewModel
     val users by authViewModel.users.collectAsState(initial = emptyList())
 
+    // Firebase Authentication instance to get the current user
+    val currentUser = FirebaseAuth.getInstance().currentUser
+    val currentUserId = currentUser?.uid
+
+    // Filter out the current user
+    val filteredUsers = remember(users, currentUserId) {
+        users.filter { user -> user.id != currentUserId }
+    }
+
     // Filtered search results based on the search query
-    val searchResults = remember(searchQuery) {
-        users.filter { user ->
-            user.username.contains(searchQuery, ignoreCase = true) ||
+    val searchResults = remember(searchQuery, filteredUsers) {
+        filteredUsers.filter { user ->
+            searchQuery.isEmpty() ||
+                    user.username.contains(searchQuery, ignoreCase = true) ||
                     user.fullName.contains(searchQuery, ignoreCase = true)
         }
     }
 
-    // Firebase Authentication check
-    val auth = FirebaseAuth.getInstance()
-    val currentUser = auth.currentUser
-
-    // If not authenticated, navigate to login
+    // Ensure the user is authenticated
     val context = LocalContext.current
-    LaunchedEffect(currentUser) {
+    LaunchedEffect(users, currentUserId, currentUser) {
         if (currentUser == null) {
             Toast.makeText(context, "Please log in to search users.", Toast.LENGTH_SHORT).show()
             navController.navigate("login") // Navigate to login screen
         }
     }
 
+    // UI elements
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
 
-    Column(modifier = modifier
-        .fillMaxSize()
-        .padding(16.dp)) {
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
         // Search Bar
         @OptIn(ExperimentalMaterial3Api::class)
         TextField(
@@ -102,7 +116,10 @@ fun SearchScreen(modifier: Modifier = Modifier, navController: NavController, au
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color.White, RoundedCornerShape(50)), // Ensure the background color is white
+                .background(
+                    Color.White,
+                    RoundedCornerShape(50)
+                ), // Ensure the background color is white
             shape = RoundedCornerShape(50),
             colors = TextFieldDefaults.textFieldColors(
                 containerColor = Color.LightGray, // Explicitly set the background color to white
@@ -123,7 +140,7 @@ fun SearchScreen(modifier: Modifier = Modifier, navController: NavController, au
         Spacer(modifier = Modifier.height(16.dp))
 
         // Show users if no query is entered
-        val displayUsers = if (searchQuery.isEmpty()) users else searchResults
+        val displayUsers = if (searchQuery.isEmpty()) filteredUsers else searchResults
 
         if (displayUsers.isEmpty()) {
             Text("No users found.", style = MaterialTheme.typography.bodyLarge)
@@ -131,7 +148,10 @@ fun SearchScreen(modifier: Modifier = Modifier, navController: NavController, au
             // Display the users
             LazyColumn {
                 items(displayUsers) { user ->
-                    UserRow(user = user, navController = navController)
+                    UserRow(
+                        user = user, navController = navController,
+                        followViewModel = followViewModel
+                    )
                 }
             }
         }
@@ -139,7 +159,10 @@ fun SearchScreen(modifier: Modifier = Modifier, navController: NavController, au
 }
 
 @Composable
-fun UserRow(user: User, navController: NavController) {
+fun UserRow(user: User, navController: NavController, followViewModel: FollowViewModel) {
+
+    val followStatus by followViewModel.followStatus.collectAsState()
+    val isFollowing = followStatus[user.id] ?: false
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
@@ -154,7 +177,8 @@ fun UserRow(user: User, navController: NavController) {
         ) {
             // Profile Picture with Circular Border - Using AsyncImage
             AsyncImage(
-                model = user.profileImageUrl?.takeIf { it.isNotBlank() } ?: R.drawable.person, // Fallback to person image if URL is empty or null
+                model = user.profileImageUrl?.takeIf { it.isNotBlank() }
+                    ?: R.drawable.person, // Fallback to person image if URL is empty or null
                 contentDescription = "User Profile Picture",
                 modifier = Modifier
                     .size(40.dp) // Reduced size of the profile picture
@@ -191,29 +215,17 @@ fun UserRow(user: User, navController: NavController) {
             Spacer(modifier = Modifier.width(8.dp)) // Reduced space between text and button
 
             // Follow Button with Original Border and Black Text
-            Button(
-                onClick = { /* TODO: Implement follow action */ },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = Color.Transparent // Transparent background
-                ),
+            FollowButton(
+                userId = user.id,
+                isFollowing = isFollowing,
                 modifier = Modifier
                     .padding(start = 8.dp)
-                    .height(32.dp) // Reduced height for the button
+                    .height(36.dp) // Reduced height for the button
                     .widthIn(min = 80.dp) // Set a minimum width for the button
-                    .border(
-                        1.dp,
-                        Color.Gray,
-                        RoundedCornerShape(8.dp)
-                    ) // 1 dp gray border with slightly curved edges
-                    .clip(RoundedCornerShape(8.dp)) // Slightly curved edges for the button
-            ) {
-                // Follow text in dark color
-                Text(
-                    text = "Follow",
-                    color = Color.Black, // Black text
-                    style = MaterialTheme.typography.bodyMedium // Regular text without bold
-                )
-            }
+                ,
+                followViewModel = followViewModel,
+                notificationViewModel = NotificationViewModel()
+            )
         }
 
         // Divider after the profile picture and user details, spanning the full width of the screen

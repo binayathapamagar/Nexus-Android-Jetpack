@@ -1,22 +1,38 @@
 package com.example.myapplication.components
 
 import android.util.Log
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.myapplication.models.NotificationType
 import com.example.myapplication.viewmodels.FollowViewModel
+import com.example.myapplication.viewmodels.NotificationViewModel
 
 @Composable
 fun FollowButton(
     userId: String,
     isFollowing: Boolean,
     modifier: Modifier = Modifier,
-    followViewModel: FollowViewModel
+    followViewModel: FollowViewModel,
+    notificationViewModel: NotificationViewModel
 ) {
     val isLoading by followViewModel.isLoading.collectAsState()
     var showUnfollowDialog by remember { mutableStateOf(false) }
@@ -48,13 +64,25 @@ fun FollowButton(
         )
     }
 
-    Button(
+    OutlinedButton(
         onClick = {
             if (isFollowing) {
                 showUnfollowDialog = true
             } else {
                 followViewModel.toggleFollow(userId)
+                try{
+                    notificationViewModel.saveNotification(
+                        recipientID = userId,
+                        actionType = NotificationType.FOLLOW,
+                        postId = "",
+                        postContent = ""
+
+                    )} catch (e: Exception) {
+                    Log.e("NotificationError", "Error saving notification: ${e.message}")
+                }
+
             }
+
         },
         modifier = modifier,
         enabled = !isLoading,
@@ -84,32 +112,21 @@ fun FollowButton(
 @Composable
 fun FollowStats(
     followersCount: Int,
-    followingCount: Int,
     modifier: Modifier = Modifier
 ) {
     Row(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
             Text(
                 text = followersCount.toString(),
                 style = MaterialTheme.typography.titleMedium
             )
             Text(
                 text = "Followers",
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
-        Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
-            Text(
-                text = followingCount.toString(),
                 style = MaterialTheme.typography.titleMedium
             )
-            Text(
-                text = "Following",
-                style = MaterialTheme.typography.bodyMedium
-            )
-        }
+
+
     }
 }

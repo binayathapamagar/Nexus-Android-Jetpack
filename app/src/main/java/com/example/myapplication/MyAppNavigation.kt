@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -28,7 +29,8 @@ import com.example.myapplication.screens.SearchScreen
 import com.example.myapplication.screens.Settings
 import com.example.myapplication.screens.SignUp
 import com.example.myapplication.screens.Thread
-import com.example.myapplication.transitions.CustomTransitions
+import com.example.myapplication.viewmodels.FollowViewModel
+import com.example.myapplication.viewmodels.NotificationViewModel
 
 @Composable
 fun MyAppNavigation(authViewModel: AuthViewModel) {
@@ -83,7 +85,11 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
         }
 
         composable(Routes.SEARCH) {
-            SearchScreen(navController = navController, authViewModel = authViewModel)
+            SearchScreen(
+                navController = navController, authViewModel = authViewModel,
+                modifier = Modifier,
+                followViewModel = FollowViewModel()
+            )
         }
 
         composable(
@@ -163,7 +169,8 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
                 authViewModel = authViewModel,
                 postId = postId,
                 replyToUsername = replyToUsername,
-                parentReplyId = parentReplyId
+                parentReplyId = parentReplyId,
+                notificationViewModel = NotificationViewModel()
             )
         }
 

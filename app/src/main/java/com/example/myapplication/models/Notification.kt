@@ -8,7 +8,24 @@ enum class NotificationType {
     FOLLOW,
     MENTION,
     REPOST,
-    REPLY
+    REPLY;
+
+    // Add a toString method that returns lowercase values
+    override fun toString(): String {
+        return name.lowercase()
+    }
+
+    companion object {
+        // Add a fromString method to parse string values
+        fun fromString(value: String): NotificationType {
+            return try {
+                valueOf(value.uppercase())
+            } catch (e: IllegalArgumentException) {
+                // Default to LIKE if unknown value is encountered
+                LIKE
+            }
+        }
+    }
 }
 
 data class Notification(
@@ -20,9 +37,23 @@ data class Notification(
     val type: NotificationType = NotificationType.LIKE,
     val postId: String? = null,
     val postContent: String? = null,
-    val postImageUrl: String? = null,
     val timestamp: Date? = null,
-    var read: Boolean = false
+    val read: Boolean = false
 ) {
-    constructor() : this("") // Required for Firebase
+    companion object {
+        fun fromMap(map: Map<String, Any>, id: String): Notification {
+            return Notification(
+                id = id,
+                recipientId = map["recipientId"] as? String ?: "",
+                senderId = map["senderId"] as? String ?: "",
+                senderName = map["senderName"] as? String,
+                senderProfileUrl = map["senderProfileUrl"] as? String,
+                type = NotificationType.fromString(map["type"] as? String ?: "like"),
+                postId = map["postId"] as? String,
+                postContent = map["postContent"] as? String,
+                timestamp = (map["timestamp"] as? com.google.firebase.Timestamp)?.toDate(),
+                read = map["read"] as? Boolean ?: false
+            )
+        }
+    }
 }

@@ -6,7 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.example.myapplication.models.Notification
 import com.example.myapplication.models.NotificationType
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.MutableData
+import com.google.firebase.database.Transaction
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
@@ -36,6 +40,7 @@ class NotificationViewModel : ViewModel() {
     // Start listening for notifications related to the current user
     fun startListeningForNotifications() {
         val currentUser = auth.currentUser ?: return
+        Log.d("NotificationViewModel", "Starting to listen for notifications for user: ${currentUser.uid}")
 
         notificationsListener?.remove()
 
@@ -44,7 +49,7 @@ class NotificationViewModel : ViewModel() {
             .orderBy("timestamp", Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, e ->
                 if (e != null) {
-                    println("Error listening for notifications: $e")
+                    Log.e("NotificationViewModel", "Error listening for notifications: ${e.message}")
                     return@addSnapshotListener
                 }
 
@@ -52,16 +57,20 @@ class NotificationViewModel : ViewModel() {
                     try {
                         val notificationsList = snapshot?.documents?.mapNotNull { doc ->
                             try {
-                                doc.toObject(Notification::class.java)?.copy(id = doc.id)
+                                doc.data?.let { data ->
+                                    Notification.fromMap(data, doc.id)
+                                }
                             } catch (e: Exception) {
+                                Log.e("NotificationViewModel", "Error converting notification: ${e.message}")
                                 null
                             }
                         } ?: emptyList()
 
                         _notifications.emit(notificationsList)
                         _hasNewNotifications.emit(notificationsList.any { !it.read })
+                        Log.d("NotificationViewModel", "Notifications updated: ${notificationsList.size}")
                     } catch (e: Exception) {
-                        println("Error processing notifications: $e")
+                        Log.e("NotificationViewModel", "Error processing notifications: ${e.message}")
                     }
                 }
             }
@@ -113,15 +122,15 @@ class NotificationViewModel : ViewModel() {
         }
     }
 
-    fun saveNotification(recipientID:String, actionType: NotificationType, postId: String, postContent:String) {
-        val currentUser  = auth.currentUser
-        if (currentUser  == null) {
-            println("Error: User not logged in")
+    fun saveNotification(recipientID: String, actionType: NotificationType, postId: String = "", postContent: String = "") {
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            Log.e("NotificationViewModel", "Error: User not logged in")
             return
         }
 
         // Reference to the user's data in the Realtime Database
-        val userDatabaseRef = FirebaseDatabase.getInstance().getReference("users").child(currentUser .uid)
+        val userDatabaseRef = FirebaseDatabase.getInstance().getReference("users").child(currentUser.uid)
 
         viewModelScope.launch {
             try {
@@ -135,7 +144,7 @@ class NotificationViewModel : ViewModel() {
                     val notification = Notification(
                         id = "",
                         recipientId = recipientID,
-                        senderId = currentUser .uid,
+                        senderId = currentUser.uid,
                         senderName = username,
                         senderProfileUrl = profileImageUrl,
                         type = actionType,
@@ -145,19 +154,44 @@ class NotificationViewModel : ViewModel() {
                         read = false
                     )
 
-                    Log.d("NotificationDebug", "Recipient ID: $recipientID, Action Type: $actionType, Post ID: $postId, Post Content: $postContent")
                     // Save the notification to Firestore
                     firestore.collection("notifications")
                         .add(notification)
                         .await()
-                    println("Notification saved for action: $actionType")
-                } else {
-                    println("User  data not found for UID: ${currentUser .uid}")
+
+                    // Update follower count if this is a follow notification
+                    if (actionType == NotificationType.FOLLOW) {
+                        updateFollowerCount(recipientID, true)
+                    }
+
+                    Log.d("NotificationDebug", "Notification saved and follower count updated for: $actionType")
                 }
             } catch (e: Exception) {
-                println("Error saving notification: $e")
+                Log.e("NotificationViewModel", "Error saving notification: ${e.message}")
             }
         }
+    }
+
+    private fun updateFollowerCount(userId: String, increment: Boolean) {
+        val userRef = FirebaseDatabase.getInstance().getReference("users").child(userId)
+        userRef.runTransaction(object : Transaction.Handler {
+            override fun doTransaction(mutableData: MutableData): Transaction.Result {
+                val currentCount = mutableData.child("followerCount").getValue(Int::class.java) ?: 0
+                val newCount = if (increment) currentCount + 1 else currentCount - 1
+                mutableData.child("followerCount").value = newCount.coerceAtLeast(0)
+                return Transaction.success(mutableData)
+            }
+
+            override fun onComplete(
+                error: DatabaseError?,
+                committed: Boolean,
+                currentData: DataSnapshot?
+            ) {
+                if (error != null) {
+                    Log.e("NotificationViewModel", "Error updating follower count: ${error.message}")
+                }
+            }
+        })
     }
 
     // Clear the notifications listener when the ViewModel is cleared

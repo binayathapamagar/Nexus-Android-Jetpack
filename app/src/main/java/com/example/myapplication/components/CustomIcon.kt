@@ -21,15 +21,20 @@ fun CustomIcon(
         CustomIconType.SHARE -> R.drawable.send2
         CustomIconType.SETTINGS -> R.drawable.more
         CustomIconType.HOME -> R.drawable.home
+        CustomIconType.HOME2 -> R.drawable.home2
         CustomIconType.SEARCH -> R.drawable.searchnormal1
+        CustomIconType.SEARCH_ON -> R.drawable.search3
         CustomIconType.ADD -> R.drawable.exportsquare
         CustomIconType.NOTIFICATION -> R.drawable.frame_12
         CustomIconType.NOTIFICATION_INACTIVE -> R.drawable.heart1
-        CustomIconType.PROFILE -> R.drawable.user
+        CustomIconType.NOTIFICATION_ON -> R.drawable.hearted3
+        CustomIconType.PROFILE -> R.drawable.user3
+        CustomIconType.PROFILE_ON -> R.drawable.user
         CustomIconType.BACK -> R.drawable.arrowleft
         CustomIconType.LANGUAGE -> R.drawable.global
         CustomIconType.MENU -> R.drawable.hambergermenu
         CustomIconType.ARROW_BACK -> R.drawable.arrowleft
+        CustomIconType.FOLLOW -> R.drawable.follow
     }
 
     Icon(
@@ -55,5 +60,10 @@ enum class CustomIconType {
     BACK,
     LANGUAGE,
     MENU,
-    ARROW_BACK
+    ARROW_BACK,
+    HOME2,
+    NOTIFICATION_ON,
+    SEARCH_ON,
+    PROFILE_ON,
+    FOLLOW
 }

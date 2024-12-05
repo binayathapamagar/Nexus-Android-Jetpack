@@ -23,6 +23,7 @@ navigationCompose = "2.8.4"
 webkit = "1.12.1"
 engageCore = "1.5.5"
 uiDesktop = "1.7.0"
+media3CommonKtx = "1.5.0"
 
 [libraries]
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanistPermissions" }
@@ -62,6 +63,7 @@ androidx-constraintlayout = { group = "androidx.constraintlayout", name = "const
 androidx-webkit = { group = "androidx.webkit", name = "webkit", version.ref = "webkit" }
 engage-core = { group = "com.google.android.engage", name = "engage-core", version.ref = "engageCore" }
 androidx-ui-desktop = { group = "androidx.compose.ui", name = "ui-desktop", version.ref = "uiDesktop" }
+androidx-media3-common-ktx = { group = "androidx.media3", name = "media3-common-ktx", version.ref = "media3CommonKtx" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

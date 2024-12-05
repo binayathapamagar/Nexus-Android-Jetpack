@@ -11,6 +11,9 @@ object Routes {
     const val REPLY = "reply/{postId}/{replyToUsername}?parentReplyId={parentReplyId}"
     const val POST_REPLIES = "post_replies/{postId}"
     const val THREAD = "thread/{postId}"
+    const val OTHER_USER = "otherUsers/{userId}"
+    const val EDIT_PROFILE = "edit_profile"
+
 
     fun createReplyRoute(
         postId: String,
@@ -25,5 +28,7 @@ object Routes {
     }
 
     fun createThreadRoute(postId: String) = "thread/$postId"
+    fun createOtherUserRoute(userId: String) = "otherUsers/$userId"
+
 }
 

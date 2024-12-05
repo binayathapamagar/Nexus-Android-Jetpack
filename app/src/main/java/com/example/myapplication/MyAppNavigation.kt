@@ -1,9 +1,15 @@
 package com.example.myapplication
 
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.EaseInOutCirc
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -11,16 +17,20 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.myapplication.navigation.Routes
+import com.example.myapplication.screens.EditProfile
 import com.example.myapplication.screens.Home
 import com.example.myapplication.screens.Login
 import com.example.myapplication.screens.MainContainer
 import com.example.myapplication.screens.NewPost
+import com.example.myapplication.screens.OtherUsers
 import com.example.myapplication.screens.PostReplies
 import com.example.myapplication.screens.Reply
 import com.example.myapplication.screens.SearchScreen
 import com.example.myapplication.screens.Settings
 import com.example.myapplication.screens.SignUp
 import com.example.myapplication.screens.Thread
+import com.example.myapplication.viewmodels.FollowViewModel
+import com.example.myapplication.viewmodels.NotificationViewModel
 
 @Composable
 fun MyAppNavigation(authViewModel: AuthViewModel) {
@@ -65,8 +75,9 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
         composable(Routes.HOME) {
             Home(
                 navController = navController,
-                postViewModel = postViewModel,
-                authViewModel = authViewModel
+                authViewModel = authViewModel,
+                postViewModel = postViewModel
+
             )
         }
 
@@ -75,10 +86,60 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
         }
 
         composable(Routes.SEARCH) {
-            SearchScreen(navController = navController, authViewModel = authViewModel)
+            SearchScreen(
+                navController = navController, authViewModel = authViewModel,
+                modifier = Modifier,
+                followViewModel = FollowViewModel()
+            )
         }
 
-        composable(Routes.NEW_POST) {
+        composable(
+            route = Routes.NEW_POST,
+            enterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                    animationSpec = tween(
+                        durationMillis = 400,
+                        easing = EaseInOutCirc
+                    )
+                ) + fadeIn(
+                    animationSpec = tween(400)
+                )
+            },
+            exitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(
+                        durationMillis = 400,
+                        easing = EaseInOutCirc
+                    )
+                ) + fadeOut(
+                    animationSpec = tween(400)
+                )
+            },
+            popEnterTransition = {
+                slideIntoContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Up,
+                    animationSpec = tween(
+                        durationMillis = 400,
+                        easing = EaseInOutCirc
+                    )
+                ) + fadeIn(
+                    animationSpec = tween(400)
+                )
+            },
+            popExitTransition = {
+                slideOutOfContainer(
+                    towards = AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(
+                        durationMillis = 400,
+                        easing = EaseInOutCirc
+                    )
+                ) + fadeOut(
+                    animationSpec = tween(400)
+                )
+            }
+        ) {
             NewPost(
                 navController = navController,
                 postViewModel = postViewModel,
@@ -109,7 +170,8 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
                 authViewModel = authViewModel,
                 postId = postId,
                 replyToUsername = replyToUsername,
-                parentReplyId = parentReplyId
+                parentReplyId = parentReplyId,
+                notificationViewModel = NotificationViewModel()
             )
         }
 
@@ -142,6 +204,34 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
                 navController = navController,
                 postViewModel = postViewModel,
                 postId = entry.arguments?.getString("postId") ?: ""
+            )
+        }
+
+        composable(
+            route = Routes.OTHER_USER,
+            arguments = listOf(
+                navArgument("userId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: return@composable
+            OtherUsers(
+                navController = navController,
+                parentNavController = navController,
+                userId = userId
+            )
+        }
+
+        composable(Routes.EDIT_PROFILE) {
+            EditProfile(
+                navController = navController,
+                authViewModel = authViewModel
+            )
+        }
+
+        composable(Routes.SETTINGS) {
+            Settings(
+                navController = navController,
+                authViewModel = authViewModel
             )
         }
     }

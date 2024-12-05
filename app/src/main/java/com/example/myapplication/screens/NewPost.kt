@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -11,13 +12,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -37,6 +39,7 @@ fun NewPost(
     var imageUris by remember { mutableStateOf<List<Uri>>(emptyList()) }
     val profileImageUrl by authViewModel.profileImageUrl.collectAsState()
     val userName by authViewModel.userName.collectAsState()
+    var isPosting by remember { mutableStateOf(false) }
 
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetMultipleContents()
@@ -44,115 +47,178 @@ fun NewPost(
         imageUris = uris
     }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Box(
-                        modifier = Modifier.fillMaxWidth(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            "New Post",
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.Default.Close, contentDescription = "Cancel")
-                    }
-                },
-                actions = {
-                    IconButton(onClick = {}) {
-                        Icon(Icons.Default.Close, contentDescription = null, tint = Color.Transparent)
-                    }
-                }
-            )
+    ModalBottomSheet(
+        onDismissRequest = { navController.popBackStack() },
+        windowInsets = WindowInsets(0),
+        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .fillMaxHeight(0.96f)
+            .padding(top = 10.dp)
+            .background(Color(0xFFF8F9FA)),
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = Color.White,
+        dragHandle = {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(36.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.Gray.copy(alpha = 0.6f))
+                )
+            }
         }
-    ) { innerPadding ->
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .background(Color.White) // Unified background color
+                .background(Color.White)
+                .padding(bottom = 32.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp)
             ) {
-                // Profile section
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    AsyncImage(
-                        model = profileImageUrl,
-                        contentDescription = "Profile Picture",
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(text = userName ?: "User")
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // TextField with updated colors
-                TextField(
-                    value = postText,
-                    onValueChange = { postText = it },
-                    placeholder = { Text("What's happening?") },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = MaterialTheme.colorScheme.surface,
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                        disabledContainerColor = MaterialTheme.colorScheme.surface,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
-                    )
-                )
-
-                // Image preview section
-                if (imageUris.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    LazyRow {
-                        items(imageUris) { uri ->
-                            AsyncImage(
-                                model = uri,
-                                contentDescription = "Selected Image",
-                                modifier = Modifier
-                                    .size(100.dp)
-                                    .padding(end = 8.dp)
-                                    .clip(RoundedCornerShape(8.dp)),
-                                contentScale = ContentScale.Crop
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Action buttons row
+                // Top Bar
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    ActionButton(Icons.Default.Image, "Add Images") { launcher.launch("image/*") }
-                    ActionButton(Icons.Default.Camera, "Take Photo") { /* TODO */ }
-                    ActionButton(Icons.Default.Gif, "Add GIF") { /* TODO */ }
-                    ActionButton(Icons.Default.Mic, "Voice Recording") { /* TODO */ }
-                    ActionButton(Icons.Default.Tag, "Add Hashtag") { /* TODO */ }
-                    ActionButton(Icons.AutoMirrored.Filled.List, "Add List") { /* TODO */ }
-                    ActionButton(Icons.Default.LocationOn, "Add Location") { /* TODO */ }
+                    Text(
+                        "Cancel",
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.clickable { navController.popBackStack() }
+                    )
+
+                    Text(
+                        "New Post",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Box(modifier = Modifier.width(48.dp))
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp)
+                ) {
+                    // Profile Section
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AsyncImage(
+                            model = profileImageUrl,
+                            contentDescription = "Profile Picture",
+                            modifier = Modifier
+                                .size(48.dp)
+                                .clip(CircleShape),
+                            contentScale = ContentScale.Crop
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = userName ?: "User",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Text Input
+                    TextField(
+                        value = postText,
+                        onValueChange = { postText = it },
+                        placeholder = {
+                            Text(
+                                "Start a thread...",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = Color.Gray
+                            )
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 50.dp) // Align with username
+                            .height(100.dp),
+                        colors = TextFieldDefaults.colors(
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent,
+                            focusedIndicatorColor = Color.Transparent,
+                            unfocusedIndicatorColor = Color.Transparent
+                        )
+                    )
+
+                    // Action Buttons
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 60.dp), // Align with text field
+                        horizontalArrangement = Arrangement.Start,
+                    ) {
+                        ActionButton(Icons.Default.Image, "Add Images") { launcher.launch("image/*") }
+                        ActionButton(Icons.Default.Gif, "Add GIF") { /* TODO */ }
+                        ActionButton(Icons.Default.Tag, "Add Hashtag") { /* TODO */ }
+                    }
+
+                    // Image Preview
+                    if (imageUris.isNotEmpty()) {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(
+                                vertical = 16.dp,
+                                horizontal = 60.dp
+                            )
+                        ) {
+                            items(imageUris) { uri ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(120.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                ) {
+                                    AsyncImage(
+                                        model = uri,
+                                        contentDescription = "Selected Image",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+
+                                    IconButton(
+                                        onClick = {
+                                            imageUris = imageUris.filter { it != uri }
+                                        },
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            .size(24.dp)
+                                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Close,
+                                            contentDescription = "Remove Image",
+                                            tint = Color.White,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
-            // Post button
+            // Post Button
             Button(
                 onClick = {
-                    if (postText.isNotBlank() || imageUris.isNotEmpty()) {
+                    if (!isPosting && (postText.isNotBlank() || imageUris.isNotEmpty())) {
+                        isPosting = true
                         postViewModel.createPost(
                             content = postText,
                             userName = userName ?: "User",
@@ -162,22 +228,34 @@ fun NewPost(
                         navController.popBackStack()
                     }
                 },
-                enabled = postText.isNotBlank() || imageUris.isNotEmpty(),
+                enabled = !isPosting && (postText.isNotBlank() || imageUris.isNotEmpty()),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.Black,
+                    contentColor = Color.White
+                ),
+                shape = RoundedCornerShape(20.dp),
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Black)
+                    .padding(16.dp)
             ) {
-                Text("Post", color = Color.White)
+                if (isPosting) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White
+                    )
+                } else {
+                    Text("Post")
+                }
             }
         }
     }
 }
 
 
+
 @Composable
 private fun ActionButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit
 ) {

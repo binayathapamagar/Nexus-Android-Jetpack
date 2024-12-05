@@ -12,6 +12,8 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.example.myapplication.PostViewModel
 import com.example.myapplication.PostWithReplies
+import com.example.myapplication.components.ShimmerListItem
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -23,9 +25,13 @@ fun Thread(
 ) {
     val post by postViewModel.getPost(postId).collectAsState(initial = null)
     val replies by postViewModel.replies.collectAsState()
+    var isLoading by remember { mutableStateOf(true) }
 
     LaunchedEffect(postId) {
+        isLoading = true
         postViewModel.fetchReplies(postId)
+        delay(500) // Add small delay to ensure loading state is visible
+        isLoading = false
     }
 
     Scaffold(
@@ -33,15 +39,10 @@ fun Thread(
             TopAppBar(
                 title = {
                     Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(end = 48.dp),
+                        modifier = Modifier.fillMaxWidth().padding(end = 48.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            "Thread",
-                            fontWeight = FontWeight.Bold
-                        )
+                        Text("Thread", fontWeight = FontWeight.Bold)
                     }
                 },
                 navigationIcon = {
@@ -58,7 +59,8 @@ fun Thread(
                 replies = replies,
                 postViewModel = postViewModel,
                 navController = navController,
-                modifier = modifier.padding(padding)
+                modifier = modifier.padding(padding),
+                isLoading = isLoading
             )
         }
     }

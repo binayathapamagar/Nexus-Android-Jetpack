@@ -2,17 +2,48 @@ package com.example.myapplication.screens
 
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
+import android.util.Log
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults.SecondaryIndicator
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
-import androidx.compose.runtime.*
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,7 +58,13 @@ import com.example.myapplication.AuthViewModel
 import com.example.myapplication.PostViewModel
 import com.example.myapplication.components.CustomIcon
 import com.example.myapplication.components.CustomIconType
+import com.example.myapplication.components.FollowStats
+import com.example.myapplication.components.ShimmerListItem
+import com.example.myapplication.navigation.Routes
 import com.example.myapplication.ui.theme.AppColors
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.tasks.await
 
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -44,7 +81,6 @@ fun Profile(
     val userName by authViewModel.userName.collectAsState()
     val userHandle by authViewModel.userHandle.collectAsState()
     val userBio by authViewModel.userBio.collectAsState()
-    val followerCount by authViewModel.followerCount.collectAsState()
     val posts by postViewModel.posts.collectAsState()
     val userPosts = posts.filter { it.userId == userId }
     val profileLink by authViewModel.profileLink.collectAsState()
@@ -52,19 +88,37 @@ fun Profile(
     val userReplies by postViewModel.userReplies.collectAsState()
     val userReposts by postViewModel.userReposts.collectAsState()
 
+    var isLoading by remember { mutableStateOf(true) }
+    var followersCount by remember { mutableIntStateOf(0) } // Declare followersCount here
+
+
     val listState = rememberLazyListState()
     val isScrolled by remember {
         derivedStateOf {
             listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0
         }
     }
+    // Fetch followers count from Firestore
+    LaunchedEffect(userId) {
+        try {
+            val statsRef = FirebaseFirestore.getInstance().collection("userStats").document(userId)
+            val stats = statsRef.get().await()
+            followersCount = stats.getLong("followersCount")?.toInt() ?: 0
+        } catch (e: Exception) {
+            Log.e("Profile", "Error fetching followers count: ${e.message}")
+        }
+        isLoading = false
+    }
 
     LaunchedEffect(userId, selectedTab) {
+        isLoading = true
         when (selectedTab) {
             0 -> postViewModel.fetchPosts()
             1 -> postViewModel.fetchUserReplies(userId)
             2 -> postViewModel.fetchUserReposts(userId)
         }
+        delay(1500)
+        isLoading = false
     }
 
     Scaffold(
@@ -81,7 +135,15 @@ fun Profile(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { navController.navigate("settings") }) {
+                    IconButton(
+                        onClick = {
+                            try {
+                                parentNavController.navigate("settings")
+                            } catch (e: Exception) {
+                                Log.e("Profile", "Error navigating to settings: ${e.message}")
+                            }
+                        }
+                    ) {
                         CustomIcon(
                             iconType = CustomIconType.MENU,
                             modifier = Modifier.size(24.dp)
@@ -167,11 +229,12 @@ fun Profile(
                         Spacer(modifier = Modifier.height(16.dp))
 
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "${followerCount ?: 0} followers",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = AppColors.TextPrimary
-                            )
+                            followersCount.let {
+                                FollowStats(
+                                    followersCount = it,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(16.dp))
@@ -181,13 +244,22 @@ fun Profile(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             OutlinedButton(
-                                onClick = { navController.navigate("edit_profile") },
+                                onClick = {
+                                    try {
+                                        parentNavController.navigate("EDIT_PROFILE") {
+                                            launchSingleTop = true
+                                        }
+                                    } catch (e: Exception) {
+                                        Log.e("Profile", "Error navigating to edit profile: ${e.message}")
+                                    }
+                                },
                                 modifier = Modifier.weight(1f),
                                 border = BorderStroke(1.dp, AppColors.Border),
                                 shape = RoundedCornerShape(8.dp)
                             ) {
                                 Text("Edit profile", color = AppColors.TextPrimary)
                             }
+
                             OutlinedButton(
                                 onClick = { showShareSheet = true },
                                 modifier = Modifier.weight(1f),
@@ -246,41 +318,71 @@ fun Profile(
 
                 // Content based on selected tab
                 when (selectedTab) {
-                    0 -> items(userPosts) { post ->
-                        PostItem(
-                            post = post,
-                            postViewModel = postViewModel,
-                            navController = parentNavController,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                        HorizontalDivider(color = AppColors.Divider)
-                    }
-                    1 -> items(userReplies) { (post, reply) ->
-                        UserReplyItem(
-                            post = post,
-                            reply = reply,
-                            postViewModel = postViewModel,
-                            navController = parentNavController,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                        HorizontalDivider(color = AppColors.Divider)
-                    }
-                    2 -> items(userReposts) { post ->
-                        if (post.isRepost) {
-                            RepostHeader(repostedByName = post.repostedByName ?: "")
+                    0 -> {
+                        if (isLoading) {
+                            items(3) {
+                                ShimmerListItem()
+                                HorizontalDivider(color = AppColors.Divider)
+                            }
+                        } else {
+                            items(userPosts) { post ->
+                                PostItem(
+                                    post = post,
+                                    postViewModel = postViewModel,
+                                    navController = parentNavController,
+                                    modifier = Modifier
+                                        .padding(horizontal = 16.dp)
+                                        .clickable {
+                                            parentNavController.navigate(Routes.createThreadRoute(post.id))
+                                        }
+                                )
+                                HorizontalDivider(color = AppColors.Divider)
+                            }
                         }
-                        PostItem(
-                            post = post,
-                            postViewModel = postViewModel,
-                            navController = parentNavController,
-                            modifier = Modifier.padding(horizontal = 16.dp)
-                        )
-                        HorizontalDivider(color = AppColors.Divider)
                     }
-                }
+                    1 -> {
+                        if (isLoading) {
+                            items(3) {
+                                ShimmerListItem()
+                                HorizontalDivider(color = AppColors.Divider)
+                            }
+                        } else {
+                            items(userReplies) { (post, reply) ->
+                                UserReplyItem(
+                                    post = post,
+                                    reply = reply,
+                                    postViewModel = postViewModel,
+                                    navController = parentNavController,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                                HorizontalDivider(color = AppColors.Divider)
+                            }
+                        }
+                    }
+                    2 -> {
+                        if (isLoading) {
+                            items(3) {
+                                ShimmerListItem()
+                                HorizontalDivider(color = AppColors.Divider)
+                            }
+                        } else {
+                            items(userReposts) { post ->
+                                if (post.isRepost) {
+                                    RepostHeader(repostedByName = post.repostedByName ?: "")
+                                }
+                                PostItem(
+                                    post = post,
+                                    postViewModel = postViewModel,
+                                    navController = parentNavController,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                                HorizontalDivider(color = AppColors.Divider)
+                            }
+                        }
+                    }
+                }}}
+
             }
-        }
-    }
 
     if (showShareSheet) {
         ShareBottomSheet(

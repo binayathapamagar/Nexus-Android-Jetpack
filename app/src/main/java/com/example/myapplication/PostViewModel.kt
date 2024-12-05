@@ -25,8 +25,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
-import java.util.*
-
+import java.util.Date
+import java.util.UUID
 
 
 class PostViewModel : ViewModel() {
@@ -70,30 +70,21 @@ class PostViewModel : ViewModel() {
             viewModelScope.launch {
                 try {
                     val imageUrls = uploadImages(imageUris)
-                    val postId = UUID.randomUUID().toString()
+                    val threadId = UUID.randomUUID().toString()
                     val timestamp = FieldValue.serverTimestamp()
 
                     val post = hashMapOf(
-                        "id" to postId,
+                        "id" to threadId,
                         "userId" to currentUser.uid,
-                        "userName" to userName,
-                        "userProfileImageUrl" to userProfileImageUrl,
                         "content" to content,
                         "imageUrls" to imageUrls,
                         "timestamp" to timestamp,
                         "likes" to 0,
                         "comments" to 0,
                         "reposts" to 0,
-                        "likedBy" to listOf<String>(),
-                        "isRepost" to false,
-                        "originalPostId" to null,
-                        "repostedBy" to null,
-                        "repostedByName" to null,
-                        "repostTimestamp" to null,
-                        "isRepostedByCurrentUser" to false
                     )
 
-                    firestore.collection("posts").document(postId).set(post)
+                    firestore.collection("threads").document(threadId).set(post)
                         .addOnSuccessListener {
                             Log.d("PostViewModel", "Post successfully written!")
                             fetchPosts()
@@ -102,7 +93,7 @@ class PostViewModel : ViewModel() {
                             Log.w("PostViewModel", "Error writing post", e)
                         }
 
-                    addToGlobalFeed(postId, timestamp)
+                    addToGlobalFeed(threadId, timestamp)
                 } catch (e: Exception) {
                     Log.e("PostViewModel", "Error creating post: ${e.message}", e)
                 }
@@ -110,9 +101,9 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    private suspend fun addToGlobalFeed(postId: String, timestamp: FieldValue) {
+    private suspend fun addToGlobalFeed(threadId: String, timestamp: FieldValue) {
         try {
-            val globalFeedRef = firestore.collection("globalFeed").document(postId)
+            val globalFeedRef = firestore.collection("globalFeed").document(threadId)
             globalFeedRef.set(mapOf("timestamp" to timestamp)).await()
             Log.d("PostViewModel", "Post added to global feed successfully")
         } catch (e: Exception) {
@@ -124,7 +115,7 @@ class PostViewModel : ViewModel() {
         return imageUris.mapNotNull { uri ->
             try {
                 val filename = UUID.randomUUID().toString()
-                val ref = storage.reference.child("post_images/$filename")
+                val ref = storage.reference.child("thread_images/$filename")
                 ref.putFile(uri).await()
                 ref.downloadUrl.await().toString()
             } catch (e: Exception) {
@@ -134,10 +125,10 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    fun deletePost(postId: String) {
+    fun deletePost(threadId: String) {
         viewModelScope.launch {
             try {
-                firestore.collection("posts").document(postId).delete().await()
+                firestore.collection("posts").document(threadId).delete().await()
                 fetchPosts()
             } catch (e: Exception) {
                 Log.e("PostViewModel", "Error deleting post: ${e.message}", e)
@@ -145,48 +136,69 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    fun fetchPosts(limit: Long = 20) {
+    @Suppress("UNCHECKED_CAST")
+    fun fetchPosts(limit: Long = 10) {
         viewModelScope.launch {
             try {
                 val currentUser = auth.currentUser ?: return@launch
-                val postsSnapshot = firestore.collection("posts")
+
+                // Fetch threads ordered by timestamp
+                val postsSnapshot = firestore.collection("threads")
                     .orderBy("timestamp", Query.Direction.DESCENDING)
                     .limit(limit)
                     .get()
                     .await()
 
-                // Fetch all reposts for current user first
-                val userRepostsSnapshot = firestore.collection("users")
-                    .document(currentUser.uid)
-                    .collection("reposts")
+                // Fetch reposts for the current user
+                val userRepostsSnapshot = firestore.collection("reposts")
+                    .whereEqualTo("userId", currentUser.uid)
                     .get()
                     .await()
 
-                val userReposts = userRepostsSnapshot.documents.associate {
-                    it.getString("originalPostId") to RepostStatus(
+                // Fetch likes for the current user
+                val userLikesSnapshot = firestore.collection("likes")
+                    .whereEqualTo("userId", currentUser.uid)
+                    .get()
+                    .await()
+
+                // Create a map of repost statuses (threadId -> RepostStatus)
+                val userReposts = userRepostsSnapshot.documents.associate { doc ->
+                    val threadId = doc.getString("threadId") ?: return@associate null to null
+                    threadId to RepostStatus(
                         isReposted = true,
-                        repostedBy = it.getString("repostedByUserId"),
-                        repostedByName = it.getString("repostedByUserName"),
-                        repostTimestamp = it.getTimestamp("timestamp")?.toDate(),
-                        repostId = it.id
+                        repostedBy = doc.getString("userId"),
+                        repostedByName = doc.getString("repostedByUserName"),
+                        repostTimestamp = doc.getTimestamp("timestamp")?.toDate(),
+                        repostId = doc.id
                     )
                 }
 
-                val fetchedPosts = postsSnapshot.documents.mapNotNull { doc ->
-                    doc.toObject(Post::class.java)?.let { post ->
-                        val likedBy = (doc.get("likedBy") as? List<*>)?.mapNotNull { it as? String }
-                            ?: emptyList()
+                // Create a set of threadIds liked by the user
+                val likedThreads = userLikesSnapshot.documents.mapNotNull { it.getString("threadId") }.toSet()
 
-                        post.copy(
-                            id = doc.id,
-                            isLikedByCurrentUser = likedBy.contains(currentUser.uid),
-                            likedBy = likedBy,
-                            likes = likedBy.size,
-                            repostStatus = userReposts[doc.id] ?: RepostStatus()
-                        )
+                // Map threads to enriched Post objects
+                val fetchedPosts = postsSnapshot.documents.mapNotNull { doc ->
+                    val postId = doc.id
+                    doc.toObject(Post::class.java)?.let { post ->
+                        doc.getString("content")?.let {
+                            post.copy(
+                                id = postId,
+                                isLikedByCurrentUser = likedThreads.contains(postId),
+                                likedBy = doc.get("likes") as? List<String> ?: emptyList(),
+                                likes = (doc.getLong("likes") ?: 0).toInt(),
+                                reposts = (doc.getLong("reposts") ?: 0).toInt(),
+                                replyCount = (doc.getLong("replyCount") ?: 0).toInt(),
+                                repostStatus = userReposts[postId] ?: RepostStatus(),
+                                timestamp = doc.getTimestamp("timestamp")?.toDate(),
+                                content = it,
+                                imageUrls = doc.get("imageUrls") as? List<String> ?: emptyList(),
+                                userId = doc.getString("ownerUid")!!
+                            )
+                        }
                     }
                 }
 
+                // Emit the fetched posts
                 _posts.value = fetchedPosts
             } catch (e: Exception) {
                 Log.e("PostViewModel", "Error fetching posts: ${e.message}")
@@ -194,11 +206,12 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    fun likePost(postId: String, isLiked: Boolean) {
+
+    fun likePost(threadId: String, isLiked: Boolean) {
         viewModelScope.launch {
             try {
                 val currentUser = auth.currentUser ?: return@launch
-                val postRef = firestore.collection("posts").document(postId)
+                val postRef = firestore.collection("threads").document(threadId)
 
                 firestore.runTransaction { transaction ->
                     val snapshot = transaction.get(postRef)
@@ -226,7 +239,7 @@ class PostViewModel : ViewModel() {
 
                 // Update local post data
                 _posts.value = _posts.value.map { post ->
-                    if (post.id == postId) {
+                    if (post.id == threadId) {
                         post.copy(
                             likes = if (isLiked) post.likedBy.size + 1 else post.likedBy.size - 1,
                             isLikedByCurrentUser = isLiked,  // Updated property name
@@ -237,7 +250,7 @@ class PostViewModel : ViewModel() {
 
                 // Send notification for liking the post
                 if (isLiked) {
-                    createNotification(postId, NotificationType.LIKE, emptyList())
+                    createNotification(threadId, NotificationType.LIKE, emptyList())
                 }
             } catch (e: Exception) {
                 Log.e("PostViewModel", "Error updating like: ${e.message}")
@@ -246,10 +259,10 @@ class PostViewModel : ViewModel() {
     }
 
     @Suppress("unused")
-    fun commentOnPost(postId: String, comment: String) {
+    fun commentOnPost(threadId: String, comment: String) {
         viewModelScope.launch {
             try {
-                val commentRef = firestore.collection("posts").document(postId)
+                val commentRef = firestore.collection("posts").document(threadId)
                     .collection("comments").document()
                 val commentData = hashMapOf(
                     "userId" to auth.currentUser?.uid,
@@ -258,11 +271,11 @@ class PostViewModel : ViewModel() {
                 )
                 commentRef.set(commentData).await()
 
-                val postRef = firestore.collection("posts").document(postId)
+                val postRef = firestore.collection("posts").document(threadId)
                 postRef.update("comments", FieldValue.increment(1)).await()
 
                 // Updated to use NotificationType
-                createNotification(postId, NotificationType.COMMENT, emptyList())
+                createNotification(threadId, NotificationType.COMMENT, emptyList())
                 fetchPosts()
             } catch (e: Exception) {
                 Log.e("PostViewModel", "Error commenting on post: ${e.message}", e)
@@ -270,14 +283,14 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    fun repostPost(postId: String) {
+    fun repostPost(threadId: String) {
         viewModelScope.launch {
             try {
                 val currentUser = auth.currentUser ?: return@launch
 
                 // Check if post is already reposted by current user
                 val existingRepost = firestore.collection("reposts")
-                    .whereEqualTo("originalPostId", postId)
+                    .whereEqualTo("originalPostId", threadId)
                     .whereEqualTo("repostedByUserId", currentUser.uid)
                     .get()
                     .await()
@@ -286,35 +299,35 @@ class PostViewModel : ViewModel() {
                     return@launch
                 }
 
-                val postRef = firestore.collection("posts").document(postId)
+                val postRef = firestore.collection("posts").document(threadId)
                 val userDoc = firestore.collection("users").document(currentUser.uid).get().await()
                 val userName =
                     userDoc.getString("fullName") ?: currentUser.displayName ?: "Unknown User"
 
-                val repostId = UUID.randomUUID().toString()
+                val rethreadId = UUID.randomUUID().toString()
                 val timestamp = FieldValue.serverTimestamp()
                 val repost = hashMapOf(
-                    "id" to repostId,
-                    "originalPostId" to postId,
+                    "id" to rethreadId,
+                    "originalPostId" to threadId,
                     "repostedByUserId" to currentUser.uid,
                     "repostedByUserName" to userName,
                     "timestamp" to timestamp
                 )
 
                 firestore.runBatch { batch ->
-                    batch.set(firestore.collection("reposts").document(repostId), repost)
+                    batch.set(firestore.collection("reposts").document(rethreadId), repost)
                     batch.update(postRef, "reposts", FieldValue.increment(1))
                     batch.set(
                         firestore.collection("users")
                             .document(currentUser.uid)
                             .collection("reposts")
-                            .document(repostId),
+                            .document(rethreadId),
                         repost
                     )
                 }.await()
 
                 _posts.value = _posts.value.map { post ->
-                    if (post.id == postId) {
+                    if (post.id == threadId) {
                         post.copy(
                             reposts = post.reposts + 1,
                             isRepostedByCurrentUser = true
@@ -324,7 +337,7 @@ class PostViewModel : ViewModel() {
 
                 // Single notification call using NotificationType
                 createNotification(
-                    postId = postId,
+                    threadId = threadId,
                     type = NotificationType.REPOST,
                     mentionedUserIds = emptyList()
                 )
@@ -340,7 +353,7 @@ class PostViewModel : ViewModel() {
     // In PostViewModel:
 
     fun addReply(
-        postId: String,
+        threadId: String,
         replyContent: String,
         imageUris: List<Uri> = emptyList(),
         parentReplyId: String? = null
@@ -366,7 +379,7 @@ class PostViewModel : ViewModel() {
                 val replyRef = if (parentReplyId != null) {
                     // For nested replies, store under the parent reply
                     firestore.collection("posts")
-                        .document(postId)
+                        .document(threadId)
                         .collection("comments")
                         .document(parentReplyId)
                         .collection("replies")
@@ -374,7 +387,7 @@ class PostViewModel : ViewModel() {
                 } else {
                     // For top-level replies
                     firestore.collection("posts")
-                        .document(postId)
+                        .document(threadId)
                         .collection("comments")
                         .document()
                 }
@@ -400,7 +413,7 @@ class PostViewModel : ViewModel() {
                     // Update reply count on parent
                     if (parentReplyId != null) {
                         val parentReplyRef = firestore.collection("posts")
-                            .document(postId)
+                            .document(threadId)
                             .collection("comments")
                             .document(parentReplyId)
 
@@ -410,19 +423,19 @@ class PostViewModel : ViewModel() {
                     }
 
                     // Update comment count on post
-                    val postRef = firestore.collection("posts").document(postId)
+                    val postRef = firestore.collection("posts").document(threadId)
                     transaction.update(postRef, "comments", FieldValue.increment(1))
                 }.await()
 
                 // Create notification
                 createNotification(
-                    postId = postId,
+                    threadId = threadId,
                     type = NotificationType.COMMENT,
                     mentionedUserIds = emptyList()
                 )
 
                 // Refresh data
-                fetchReplies(postId)
+                fetchReplies(threadId)
             } catch (e: Exception) {
                 Log.e("PostViewModel", "Error adding reply: ${e.message}", e)
                 throw e
@@ -431,9 +444,9 @@ class PostViewModel : ViewModel() {
     }
 
     // New helper function to fetch and build nested replies
-    private suspend fun fetchAndBuildNestedReplies(postId: String): List<Reply> {
-        val repliesSnapshot = firestore.collection("posts")
-            .document(postId)
+    private suspend fun fetchAndBuildNestedReplies(threadId: String): List<Reply> {
+        val repliesSnapshot = firestore.collection("threads")
+            .document(threadId)
             .collection("comments")
             .orderBy("timestamp", Query.Direction.ASCENDING)
             .get()
@@ -448,7 +461,7 @@ class PostViewModel : ViewModel() {
                 val reply = parseReplyDocument(doc, currentUser?.uid)
 
                 // Fetch nested replies from the 'replies' subcollection
-                val nestedRepliesSnapshot = fetchNestedRepliesForComment(postId, doc.id).await()
+                val nestedRepliesSnapshot = fetchNestedRepliesForComment(threadId, doc.id).await()
 
                 // Parse nested replies
                 val nestedReplies = nestedRepliesSnapshot.documents.mapNotNull { nestedDoc ->
@@ -495,7 +508,7 @@ class PostViewModel : ViewModel() {
 
 
     fun addNestedReply(
-        postId: String,
+        threadId: String,
         parentReplyId: String,
         content: String,
         imageUris: List<Uri> = emptyList()
@@ -521,8 +534,8 @@ class PostViewModel : ViewModel() {
 
                 // Get parent reply reference
                 val parentReplyRef = firestore.collection("posts")
-                    .document(postId)
-                    .collection("comments")
+                    .document(threadId)
+                    .collection("replies")
                     .document(parentReplyId)
 
                 val replyRef = parentReplyRef.collection("replies").document()
@@ -545,7 +558,7 @@ class PostViewModel : ViewModel() {
                 // Perform all reads first
                 val parentReplySnapshot = parentReplyRef.get().await()
                 val currentReplies = parentReplySnapshot.getLong("replies") ?: 0
-                val postRef = firestore.collection("posts").document(postId)
+                val postRef = firestore.collection("posts").document(threadId)
 
                 // Then perform all writes in a transaction
                 firestore.runTransaction { transaction ->
@@ -562,7 +575,7 @@ class PostViewModel : ViewModel() {
                 // Create notification for parent reply owner
                 val parentReplyUserId = parentReplySnapshot.getString("userId")
                 if (parentReplyUserId != null && parentReplyUserId != currentUser.uid) {
-                    createNotification(postId, NotificationType.COMMENT, listOf(parentReplyUserId))
+                    createNotification(threadId, NotificationType.COMMENT, listOf(parentReplyUserId))
                 }
 
                 // Create Reply object for immediate state update
@@ -592,7 +605,7 @@ class PostViewModel : ViewModel() {
                 delay(300)
 
                 // Refresh the entire replies tree to ensure consistency
-                fetchReplies(postId)
+                fetchReplies(threadId)
 
             } catch (e: Exception) {
                 Log.e("PostViewModel", "Error adding nested reply: ${e.message}", e)
@@ -603,11 +616,11 @@ class PostViewModel : ViewModel() {
 
 
     private fun fetchNestedRepliesForComment(
-        postId: String,
+        threadId: String,
         commentId: String
     ): Task<QuerySnapshot> {
-        return firestore.collection("posts")
-            .document(postId)
+        return firestore.collection("threads")
+            .document(threadId)
             .collection("comments")
             .document(commentId)
             .collection("replies")
@@ -615,7 +628,7 @@ class PostViewModel : ViewModel() {
             .get()
     }
 
-    private fun updateNestedRepliesInState(postId: String, parentReplyId: String, newReply: Reply) {
+    private fun updateNestedRepliesInState(threadId: String, parentReplyId: String, newReply: Reply) {
         _replies.value = _replies.value.map { reply ->
             if (reply.id == parentReplyId) {
                 // Directly update the parent reply
@@ -655,14 +668,14 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    fun getPost(postId: String): StateFlow<Post?> {
+    fun getPost(threadId: String): StateFlow<Post?> {
         val postFlow = MutableStateFlow<Post?>(null)
 
         viewModelScope.launch {
             try {
                 val document = withContext(Dispatchers.IO) {
-                    firestore.collection("posts")
-                        .document(postId)
+                    firestore.collection("threads")
+                        .document(threadId)
                         .get()
                         .await()
                 }
@@ -678,13 +691,13 @@ class PostViewModel : ViewModel() {
         return postFlow.asStateFlow()
     }
 
-    fun likeReply(postId: String, replyId: String, isLiked: Boolean) {
+    fun likeReply(threadId: String, replyId: String, isLiked: Boolean) {
         viewModelScope.launch {
             try {
                 val currentUser = auth.currentUser ?: return@launch
-                val replyRef = firestore.collection("posts")
-                    .document(postId)
-                    .collection("comments")
+                val replyRef = firestore.collection("threads")
+                    .document(threadId)
+                    firestore.collection("replies")
                     .document(replyId)
 
                 firestore.runTransaction { transaction ->
@@ -724,7 +737,7 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    fun fetchReplies(postId: String) {
+    fun fetchReplies(threadId: String) {
         viewModelScope.launch {
             try {
                 val topLevelReplies = mutableListOf<Reply>()
@@ -732,7 +745,7 @@ class PostViewModel : ViewModel() {
 
                 // Fetch top-level replies
                 val repliesSnapshot = firestore.collection("posts")
-                    .document(postId)
+                    .document(threadId)
                     .collection("comments")
                     .orderBy("timestamp", Query.Direction.ASCENDING)
                     .get()
@@ -838,12 +851,12 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    fun repostReply(postId: String, replyId: String) {
+    fun repostReply(threadId: String, replyId: String) {
         viewModelScope.launch {
             try {
                 val currentUser = auth.currentUser ?: return@launch
                 val replyRef = firestore.collection("posts")
-                    .document(postId)
+                    .document(threadId)
                     .collection("comments")
                     .document(replyId)
 
@@ -869,12 +882,12 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    fun deleteReply(postId: String, replyId: String) {
+    fun deleteReply(threadId: String, replyId: String) {
         viewModelScope.launch {
             try {
                 // Delete the reply document
                 firestore.collection("posts")
-                    .document(postId)
+                    .document(threadId)
                     .collection("comments")
                     .document(replyId)
                     .delete()
@@ -882,21 +895,23 @@ class PostViewModel : ViewModel() {
 
                 // Update the comments count on the post
                 firestore.collection("posts")
-                    .document(postId)
+                    .document(threadId)
                     .update("comments", FieldValue.increment(-1))
                     .await()
 
                 // Update local state for replies
                 _replies.value = _replies.value.filter { it.id != replyId }
 
-                // Update local state for posts to reflect the new comment count
                 _posts.value = _posts.value.map { post ->
-                    if (post.id == postId) {
-                        post.copy(comments = (post.comments - 1).coerceAtLeast(0))
+                    if (post.id == threadId) {
+                        post.copy(
+                            replyCount = (post.replyCount - 1).coerceAtLeast(0) // Use replyCount for better semantics
+                        )
                     } else {
                         post
                     }
                 }
+
 
                 // Update user replies if we're in the profile view
                 _userReplies.value = _userReplies.value.filter { (_, reply) -> reply.id != replyId }
@@ -908,15 +923,15 @@ class PostViewModel : ViewModel() {
         }
     }
 
-    fun undoRepost(postId: String) {
+    fun undoRepost(threadId: String) {
         viewModelScope.launch {
             try {
                 val currentUser = auth.currentUser ?: return@launch
-                val postRef = firestore.collection("posts").document(postId)
+                val postRef = firestore.collection("posts").document(threadId)
 
                 // Find the repost document
                 val repostQuery = firestore.collection("reposts")
-                    .whereEqualTo("originalPostId", postId)
+                    .whereEqualTo("originalPostId", threadId)
                     .whereEqualTo("repostedByUserId", currentUser.uid)
                     .get()
                     .await()
@@ -942,7 +957,7 @@ class PostViewModel : ViewModel() {
 
                     // Update local states
                     _posts.value = _posts.value.map { post ->
-                        if (post.id == postId) {
+                        if (post.id == threadId) {
                             post.copy(
                                 reposts = (post.reposts - 1).coerceAtLeast(0),
                                 isRepostedByCurrentUser = false
@@ -951,7 +966,7 @@ class PostViewModel : ViewModel() {
                     }
 
                     // Update userReposts if we're in the profile view
-                    _userReposts.value = _userReposts.value.filter { it.id != postId }
+                    _userReposts.value = _userReposts.value.filter { it.id != threadId }
 
                     // Fetch updated reposts
                     fetchUserReposts(currentUser.uid)
@@ -1037,7 +1052,7 @@ class PostViewModel : ViewModel() {
     }
 
     private suspend fun createNotification(
-        postId: String,
+        threadId: String,
         type: NotificationType,
         mentionedUserIds: List<String> = emptyList()
     ) {
@@ -1048,7 +1063,7 @@ class PostViewModel : ViewModel() {
                 val senderName = userDoc.getString("fullName") ?: return@withContext
                 val senderProfileUrl = userDoc.getString("profileImageUrl")
 
-                val postDoc = firestore.collection("posts").document(postId).get().await()
+                val postDoc = firestore.collection("posts").document(threadId).get().await()
                 val post = postDoc.toObject(Post::class.java) ?: return@withContext
 
                 if (post.userId == currentUser.uid) return@withContext
@@ -1065,9 +1080,9 @@ class PostViewModel : ViewModel() {
                         "senderName" to senderName,
                         "senderProfileUrl" to senderProfileUrl,
                         "type" to type.name,  // Enum usage
-                        "postId" to postId,
+                        "threadId" to threadId,
                         "postContent" to post.content,
-                        "postImageUrl" to (post.imageUrls.firstOrNull() ?: ""),
+                        "imageUrls" to post.imageUrls,
                         "timestamp" to FieldValue.serverTimestamp(),
                         "read" to false
                     )
@@ -1085,9 +1100,9 @@ class PostViewModel : ViewModel() {
                             "senderName" to senderName,
                             "senderProfileUrl" to senderProfileUrl,
                             "type" to NotificationType.MENTION.name,  // Explicit mention type
-                            "postId" to postId,
+                            "threadId" to threadId,
                             "postContent" to post.content,
-                            "postImageUrl" to (post.imageUrls.firstOrNull() ?: ""),
+                            "imageUrls" to post.imageUrls,
                             "timestamp" to FieldValue.serverTimestamp(),
                             "read" to false
                         )

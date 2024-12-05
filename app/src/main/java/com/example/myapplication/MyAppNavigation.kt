@@ -31,8 +31,8 @@ fun MyAppNavigation(authViewModel: AuthViewModel) {
     // Handle authentication-based navigation
     LaunchedEffect(authState) {
         val destination = when (authState) {
-            is AuthState.Authenticated -> Routes.MAIN
-            is AuthState.Unauthenticated -> Routes.LOGIN
+            is AuthViewModel.AuthState.Authenticated -> Routes.MAIN
+            is AuthViewModel.AuthState.Unauthenticated -> Routes.LOGIN
             else -> null
         }
         destination?.let {

@@ -2,10 +2,28 @@ package com.example.myapplication.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -14,7 +32,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
-import com.example.myapplication.AuthState
 import com.example.myapplication.AuthViewModel
 import com.example.myapplication.R
 import com.example.myapplication.ui.theme.AppColors
@@ -29,19 +46,19 @@ fun Login(navController: NavController, authViewModel: AuthViewModel) {
 
     LaunchedEffect(authState) {
         when (authState) {
-            is AuthState.Authenticated -> {
+            is AuthViewModel.AuthState.Authenticated -> {
                 navController.navigate("main") {
                     popUpTo("login") { inclusive = true }
                 }
             }
-            is AuthState.Error -> {
+            is AuthViewModel.AuthState.Error -> {
                 Toast.makeText(
                     context,
-                    (authState as AuthState.Error).message,
+                    (authState as AuthViewModel.AuthState.Error).message,
                     Toast.LENGTH_SHORT
                 ).show()
             }
-            is AuthState.Unauthenticated -> {
+            is AuthViewModel.AuthState.Unauthenticated -> {
                 // Handle unauthenticated state if necessary
             }
             else -> Unit
@@ -101,7 +118,7 @@ fun Login(navController: NavController, authViewModel: AuthViewModel) {
 
             Button(
                 onClick = { authViewModel.login(email, password) },
-                enabled = authState != AuthState.Loading,
+                enabled = authState != AuthViewModel.AuthState.Loading,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = AppColors.Black)
             ) {

@@ -1,19 +1,17 @@
 package com.example.myapplication
 
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.storage.FirebaseStorage
-import com.google.firebase.storage.StorageReference
-import kotlinx.coroutines.launch
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.myapplication.models.Post
 import com.example.myapplication.models.Reply
 import com.example.myapplication.models.Repost
 import com.example.myapplication.models.UserProfile
-
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageReference
+import kotlinx.coroutines.launch
 
 class UserProfileViewModel : ViewModel() {
 
@@ -24,18 +22,17 @@ class UserProfileViewModel : ViewModel() {
     val reposts: MutableState<List<Repost>> = mutableStateOf(emptyList())
     val isLoading = mutableStateOf(true)
 
-    private val database = FirebaseDatabase.getInstance().reference
-    private val firestore = FirebaseFirestore.getInstance()  // Firestore instance for posts, replies, and reposts
+    private val firestore = FirebaseFirestore.getInstance()  // Firestore instance for all data
     private val storage = FirebaseStorage.getInstance().reference
 
-    // Function to fetch real data from Firebase Realtime Database and Storage
+    // Function to fetch real data from Firestore
     fun fetchUserData(userId: String) {
         viewModelScope.launch {
             try {
-                // Fetch User Profile from Realtime Database
-                val userRef = database.child("users").child(userId)
-                userRef.get().addOnSuccessListener { dataSnapshot ->
-                    val userProfileData = dataSnapshot.getValue(UserProfile::class.java)
+                // Fetch User Profile from Firestore
+                val userRef = firestore.collection("users").document(userId)
+                userRef.get().addOnSuccessListener { documentSnapshot ->
+                    val userProfileData = documentSnapshot.toObject(UserProfile::class.java)
                     if (userProfileData != null) {
                         userProfile.value = userProfileData
 

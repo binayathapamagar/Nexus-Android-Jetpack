@@ -368,7 +368,7 @@ fun PostItem(
 
                     // Comment button
                     ActionButton(
-                        count = post.comments,
+                        count = post.replyCount,
                         iconType = CustomIconType.COMMENT,
                         onClick = {
                             navController.navigate(Routes.createReplyRoute(post.id, post.userName))

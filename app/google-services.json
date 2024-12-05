@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "1051854095137",
-    "project_id": "practice-258ea",
-    "storage_bucket": "practice-258ea.appspot.com"
+    "project_number": "1028123297401",
+    "project_id": "nexus-a18ad",
+    "storage_bucket": "nexus-a18ad.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1051854095137:android:8eb40e5d57a170b24f7460",
+        "mobilesdk_app_id": "1:1028123297401:android:7d820a068af9c68f4a76a8",
         "android_client_info": {
           "package_name": "com.example.myapplication"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBprDeAPaWeGd9FqrFLkLo8wHw0lrvaYTc"
+          "current_key": "AIzaSyAG8KD2p8qAJxkVcP5eLejuEe8ccPy6O1o"
         }
       ],
       "services": {

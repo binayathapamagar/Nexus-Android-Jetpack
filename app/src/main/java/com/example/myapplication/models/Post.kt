@@ -12,7 +12,7 @@ data class Post(
     val imageUrls: List<String> = emptyList(),
     val timestamp: Date? = null,
     val likes: Int = 0,
-    val comments: Int = 0,
+    val replyCount: Int = 0,
     val reposts: Int = 0,
     val isLikedByCurrentUser: Boolean = false,
     val likedBy: List<String> = emptyList(),

@@ -4,23 +4,20 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.myapplication.models.User
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.storage.FirebaseStorage
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
-import com.example.myapplication.models.User
 
 class AuthViewModel : ViewModel() {
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
-    private val database: FirebaseDatabase = FirebaseDatabase.getInstance()
+    private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
     private val storage: FirebaseStorage = FirebaseStorage.getInstance()
 
     private val _authState = MutableStateFlow<AuthState>(AuthState.Loading)
@@ -47,7 +44,7 @@ class AuthViewModel : ViewModel() {
     private val _users = MutableStateFlow<List<User>>(emptyList())
     val users: StateFlow<List<User>> = _users.asStateFlow()
 
-    private var userListener: ValueEventListener? = null
+    private var userListener: ListenerRegistration? = null
 
     val currentUserId: String?
         get() = auth.currentUser?.uid
@@ -72,46 +69,43 @@ class AuthViewModel : ViewModel() {
 
     private fun setupUserListener() {
         val user = auth.currentUser ?: return
-        val userRef = database.getReference("users").child(user.uid)
+        val userRef = firestore.collection("users").document(user.uid)
 
-        userListener?.let { userRef.removeEventListener(it) }
+        userListener?.remove()
 
-        userListener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                if (snapshot.exists()) {
-                    viewModelScope.launch {
-                        _profileImageUrl.emit(snapshot.child("profileImageUrl").getValue(String::class.java))
-                        _userName.emit(snapshot.child("fullName").getValue(String::class.java))
-                        _userHandle.emit(snapshot.child("username").getValue(String::class.java))
-                        _userBio.emit(snapshot.child("bio").getValue(String::class.java))
-                        _profileLink.emit(snapshot.child("profileLink").getValue(String::class.java))
-                        _followerCount.emit(snapshot.child("followerCount").getValue(Int::class.java) ?: 0)
-                    }
+        userListener = userRef.addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                viewModelScope.launch {
+                    _authState.emit(AuthState.Error(error.message ?: "Error fetching user data"))
                 }
+                return@addSnapshotListener
             }
 
-            override fun onCancelled(error: DatabaseError) {
+            if (snapshot != null && snapshot.exists()) {
+                val userData = snapshot.data
                 viewModelScope.launch {
-                    _authState.emit(AuthState.Error(error.message))
+                    _profileImageUrl.emit(userData?.get("profileImageUrl") as? String)
+                    _userName.emit(userData?.get("fullName") as? String)
+                    _userHandle.emit(userData?.get("username") as? String)
+                    _userBio.emit(userData?.get("bio") as? String)
+                    _profileLink.emit(userData?.get("profileLink") as? String)
+                    _followerCount.emit((userData?.get("followerCount") as? Long)?.toInt() ?: 0)
                 }
             }
         }
-
-        userRef.addValueEventListener(userListener!!)
     }
 
     private fun fetchAllUsers() {
         viewModelScope.launch {
-            val userRef = database.getReference("users")
-            userRef.get().addOnSuccessListener { snapshot ->
-                if (snapshot.exists()) {
+            firestore.collection("users").get().addOnSuccessListener { snapshot ->
+                if (!snapshot.isEmpty) {
                     Log.d("AuthViewModel", "Fetched all users successfully.")
-                    val userList = snapshot.children.mapNotNull { dataSnap ->
-                        val userId = dataSnap.key ?: return@mapNotNull null
-                        val fullName = dataSnap.child("fullName").getValue(String::class.java) ?: "Unknown Name"
-                        val username = dataSnap.child("username").getValue(String::class.java) ?: "Unknown Username"
-                        val bio = dataSnap.child("bio").getValue(String::class.java) ?: "No bio available"
-                        val profileImageUrl = dataSnap.child("profileImageUrl").getValue(String::class.java)
+                    val userList = snapshot.documents.mapNotNull { document ->
+                        val userId = document.id
+                        val fullName = document.getString("fullName") ?: "Unknown Name"
+                        val username = document.getString("username") ?: "Unknown Username"
+                        val bio = document.getString("bio") ?: "No bio available"
+                        val profileImageUrl = document.getString("profileImageUrl")
 
                         User(
                             id = userId,
@@ -190,7 +184,7 @@ class AuthViewModel : ViewModel() {
     private suspend fun saveUserToDatabase(
         userId: String, fullName: String, username: String, email: String, bio: String, profileImageUrl: String?
     ) {
-        val userRef = database.getReference("users").child(userId)
+        val userRef = firestore.collection("users").document(userId)
         val user = HashMap<String, Any>()
         user["fullName"] = fullName
         user["username"] = username
@@ -199,7 +193,7 @@ class AuthViewModel : ViewModel() {
         profileImageUrl?.let { user["profileImageUrl"] = it }
 
         try {
-            userRef.setValue(user).await()
+            userRef.set(user).await()
             _authState.emit(AuthState.Authenticated)
         } catch (e: Exception) {
             _authState.emit(AuthState.Error("Failed to save user data"))
@@ -215,7 +209,7 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val userId = auth.currentUser?.uid ?: return@launch
-                val userRef = database.getReference("users").child(userId)
+                val userRef = firestore.collection("users").document(userId)
 
                 // Upload new image if provided
                 val newImageUrl: String? = if (newImageUri != null) {
@@ -224,14 +218,14 @@ class AuthViewModel : ViewModel() {
                     _profileImageUrl.value
                 }
 
-                // Update user profile in Realtime Database
+                // Update user profile in Firestore
                 val updates = hashMapOf<String, Any>(
                     "fullName" to name,
                     "bio" to bio,
                     "profileLink" to profileLink
                 )
                 newImageUrl?.let { updates["profileImageUrl"] = it }
-                userRef.updateChildren(updates).await()
+                userRef.update(updates).await()
 
                 // Update posts in Firestore
                 val firestore = FirebaseFirestore.getInstance()
@@ -261,53 +255,22 @@ class AuthViewModel : ViewModel() {
                 newImageUrl?.let { _profileImageUrl.emit(it) }
 
             } catch (e: Exception) {
-                _authState.emit(AuthState.Error(e.message ?: "Failed to update profile"))
+                _authState.emit(AuthState.Error("Failed to update profile"))
             }
         }
     }
 
     fun logout() {
         viewModelScope.launch {
-            try {
-                // Remove the user listener before logging out
-                userListener?.let {
-                    database.getReference("users").child(currentUserId ?: "").removeEventListener(it)
-                    userListener = null
-                }
-                auth.signOut()
-                _authState.emit(AuthState.Unauthenticated)
-                clearUserDataAsync()
-            } catch (e: Exception) {
-                _authState.emit(AuthState.Error("Failed to log out: ${e.message}"))
-            }
+            auth.signOut()
+            _authState.emit(AuthState.Unauthenticated)
         }
     }
 
-    private fun clearUserDataAsync() {
-        viewModelScope.launch {
-            _profileImageUrl.emit(null)
-            _userName.emit(null)
-            _userHandle.emit(null)
-            _userBio.emit(null)
-            _profileLink.emit(null)
-            _followerCount.emit(null)
-        }
+    sealed class AuthState {
+        object Loading : AuthState()
+        object Unauthenticated : AuthState()
+        object Authenticated : AuthState()
+        data class Error(val message: String) : AuthState()
     }
-
-    override fun onCleared() {
-        super.onCleared()
-        // Clean up listener when ViewModel is cleared
-        userListener?.let {
-            currentUserId?.let { userId ->
-                database.getReference("users").child(userId).removeEventListener(it)
-            }
-        }
-    }
-}
-
-sealed class AuthState {
-    data object Authenticated : AuthState()
-    data object Unauthenticated : AuthState()
-    data object Loading : AuthState()
-    data class Error(val message: String) : AuthState()
 }

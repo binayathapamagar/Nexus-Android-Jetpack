@@ -218,7 +218,6 @@ private fun TabSection(
 private fun ThreadsTab(
     posts: List<Post>,
     postViewModel: PostViewModel,
-
     parentNavController: NavController
 ) {
     LazyColumn {
